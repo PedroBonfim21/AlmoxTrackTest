@@ -12,6 +12,10 @@ import {
   Users,
   Warehouse,
   Settings,
+  History,
+  Replace,
+  ChevronsLeftRight,
+  FileCog
 } from "lucide-react";
 import {
   SidebarProvider,
@@ -23,6 +27,8 @@ import {
   SidebarMenuButton,
   SidebarInset,
   SidebarTrigger,
+  SidebarFooter,
+  SidebarSeparator
 } from "@/components/ui/sidebar";
 import {
   DropdownMenu,
@@ -33,6 +39,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { usePathname } from "next/navigation";
 
 export default function DashboardLayout({
@@ -43,12 +50,11 @@ export default function DashboardLayout({
   const pathname = usePathname();
 
   const navItems = [
-    { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
-    { href: "#", icon: Package, label: "Produtos" },
-    { href: "#", icon: ArrowRightToLine, label: "Entradas" },
-    { href: "#", icon: ArrowLeftFromLine, label: "Saídas" },
-    { href: "#", icon: FileText, label: "Relatórios" },
-    { href: "#", icon: Users, label: "Usuários" },
+    { href: "/dashboard", icon: LayoutDashboard, label: "Painel" },
+    { href: "/dashboard/inventory", icon: Package, label: "Inventário" },
+    { href: "#", icon: ArrowRightToLine, label: "Entrada" },
+    { href: "#", icon: ArrowLeftFromLine, label: "Saída" },
+    { href: "#", icon: ChevronsLeftRight, label: "Devolução" },
   ];
 
   return (
@@ -57,7 +63,7 @@ export default function DashboardLayout({
         <SidebarHeader>
           <div className="flex items-center gap-2 p-2">
             <Warehouse className="w-8 h-8 text-primary" />
-            <span className="text-xl font-semibold">AlmoxTrack</span>
+            <span className="text-xl font-semibold">Almoxarifado</span>
           </div>
         </SidebarHeader>
         <SidebarContent>
@@ -75,14 +81,60 @@ export default function DashboardLayout({
                 </Link>
               </SidebarMenuItem>
             ))}
+             <SidebarMenuItem>
+                <Link href="#" passHref legacyBehavior>
+                  <SidebarMenuButton
+                    isActive={pathname === "#"}
+                    tooltip={"Sincronizar Planilha"}
+                  >
+                    <FileCog />
+                    <span>{"Sincronizar Planilha"}</span>
+                  </SidebarMenuButton>
+                </Link>
+              </SidebarMenuItem>
           </SidebarMenu>
         </SidebarContent>
+        <SidebarSeparator />
+        <SidebarFooter>
+           <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="justify-start w-full h-auto px-2 py-2">
+                 <div className="flex justify-between w-full items-center">
+                    <div className="flex gap-2 items-center">
+                       <Avatar className="w-8 h-8">
+                         <AvatarFallback>A</AvatarFallback>
+                       </Avatar>
+                       <div className="flex flex-col items-start text-sm">
+                         <span className="font-medium text-sidebar-foreground">Admin</span>
+                         <span className="text-muted-foreground text-xs">admin@email.com</span>
+                       </div>
+                    </div>
+                 </div>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuLabel>Minha Conta</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem>
+                <Settings className="mr-2 h-4 w-4" />
+                Configurações
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+               <DropdownMenuItem asChild>
+                 <Link href="/login">
+                   <LogOut className="mr-2 h-4 w-4" />
+                   Sair
+                 </Link>
+               </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </SidebarFooter>
       </Sidebar>
       <SidebarInset>
         <header className="sticky top-0 z-30 flex h-16 items-center justify-end gap-4 border-b bg-background/80 backdrop-blur-sm px-4 sm:px-6">
           <SidebarTrigger className="sm:hidden -ml-2" />
           <div className="flex-1" />
-          <DropdownMenu>
+           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
                 variant="outline"
