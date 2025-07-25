@@ -74,10 +74,11 @@ export function EditItemSheet({ isOpen, onOpenChange, onItemUpdated, item }: Edi
             unit: item.unit,
             quantity: item.quantity,
             category: item.category,
+            image: null,
         });
-        setImagePreview(item.image);
+        setImagePreview(item.imagePreview || item.image);
     }
-  }, [item, form]);
+  }, [item, form, isOpen]);
 
   const materialType = form.watch("materialType");
 
@@ -118,7 +119,7 @@ export function EditItemSheet({ isOpen, onOpenChange, onItemUpdated, item }: Edi
 
   return (
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
-      <SheetContent className="sm:max-w-2xl">
+      <SheetContent className="sm:max-w-2xl overflow-y-auto">
         <SheetHeader>
           <SheetTitle>Editar Item</SheetTitle>
           <SheetDescription>
@@ -142,7 +143,7 @@ export function EditItemSheet({ isOpen, onOpenChange, onItemUpdated, item }: Edi
                     accept="image/*"
                   />
                   {imagePreview ? (
-                     <Image src={imagePreview} alt="Preview" layout="fill" objectFit="contain" className="rounded-lg" />
+                     <Image src={imagePreview} alt="Preview" layout="fill" objectFit="cover" className="rounded-lg" />
                   ) : (
                     <div className="text-center text-muted-foreground">
                       <Upload className="mx-auto h-8 w-8 mb-2" />
@@ -158,7 +159,7 @@ export function EditItemSheet({ isOpen, onOpenChange, onItemUpdated, item }: Edi
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Tipo de Material</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Selecione o tipo de material" />
@@ -213,6 +214,7 @@ export function EditItemSheet({ isOpen, onOpenChange, onItemUpdated, item }: Edi
                           placeholder="Ex: 123456" 
                           {...field} 
                           disabled={materialType === 'consumo'}
+                          value={field.value || ''}
                         />
                       </FormControl>
                       <FormMessage />
@@ -267,7 +269,7 @@ export function EditItemSheet({ isOpen, onOpenChange, onItemUpdated, item }: Edi
                   Cancelar
                 </Button>
               </SheetClose>
-              <Button type="submit">Salvar Item</Button>
+              <Button type="submit">Salvar Alterações</Button>
             </SheetFooter>
           </form>
         </Form>

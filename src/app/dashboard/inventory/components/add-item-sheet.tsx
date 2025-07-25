@@ -69,6 +69,7 @@ export function AddItemSheet({ isOpen, onOpenChange, onItemAdded }: AddItemSheet
       unit: "",
       initialQuantity: 0,
       category: "",
+      image: null,
     },
   });
 
@@ -111,7 +112,7 @@ export function AddItemSheet({ isOpen, onOpenChange, onItemAdded }: AddItemSheet
 
   return (
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
-      <SheetContent className="sm:max-w-2xl">
+      <SheetContent className="sm:max-w-2xl overflow-y-auto">
         <SheetHeader>
           <SheetTitle>Adicionar Novo Item</SheetTitle>
           <SheetDescription>
@@ -135,7 +136,7 @@ export function AddItemSheet({ isOpen, onOpenChange, onItemAdded }: AddItemSheet
                     accept="image/*"
                   />
                   {imagePreview ? (
-                     <Image src={imagePreview} alt="Preview" layout="fill" objectFit="contain" className="rounded-lg" />
+                     <Image src={imagePreview} alt="Preview" layout="fill" objectFit="cover" className="rounded-lg" />
                   ) : (
                     <div className="text-center text-muted-foreground">
                       <Upload className="mx-auto h-8 w-8 mb-2" />

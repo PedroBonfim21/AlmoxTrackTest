@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Image from "next/image";
-import { PlusCircle, Search, History, Edit, MoreHorizontal } from "lucide-react";
+import { PlusCircle, Search, History, Edit, MoreHorizontal, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -27,12 +27,22 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { AddItemSheet } from "./components/add-item-sheet";
 import { EditItemSheet } from "./components/edit-item-sheet";
 
-
-const products = [
+const initialProducts = [
   {
     id: "1",
     image: "https://placehold.co/40x40.png",
@@ -90,22 +100,66 @@ const products = [
   },
 ];
 
+type Product = typeof initialProducts[0] & { imagePreview?: string };
+
 export default function InventoryPage() {
+  const [products, setProducts] = React.useState<Product[]>(initialProducts);
   const [searchTerm, setSearchTerm] = React.useState("");
   const [isAddSheetOpen, setIsAddSheetOpen] = React.useState(false);
   const [isEditSheetOpen, setIsEditSheetOpen] = React.useState(false);
   const [selectedItem, setSelectedItem] = React.useState<any>(null);
+  const [itemToDelete, setItemToDelete] = React.useState<any>(null);
 
-  const handleAddItem = (newItem: any) => {
-    console.log("New item added:", newItem);
-    // Here you would typically update your state or make an API call
-    // For now, we'll just log it to the console.
+
+  const handleAddItem = (newItemData: any) => {
+    const newItem: Product = {
+        id: (products.length + 1).toString(),
+        name: newItemData.name,
+        code: newItemData.itemCode || `00${products.length + 1}-25`,
+        patrimony: newItemData.materialType === 'permanente' ? newItemData.patrimony : 'N/A',
+        type: newItemData.materialType,
+        quantity: newItemData.initialQuantity,
+        unit: newItemData.unit,
+        category: newItemData.category,
+        image: "https://placehold.co/40x40.png"
+    };
+    
+    if (newItemData.image instanceof File) {
+        newItem.imagePreview = URL.createObjectURL(newItemData.image);
+    }
+
+    setProducts(prevProducts => [...prevProducts, newItem]);
   };
   
-  const handleUpdateItem = (updatedItem: any) => {
-    console.log("Item updated:", updatedItem);
-    // Here you would typically update your state or make an API call
+  const handleUpdateItem = (updatedItemData: any) => {
+    setProducts(prevProducts =>
+        prevProducts.map(p => {
+            if (p.id === selectedItem.id) {
+                const updatedProduct: Product = {
+                    ...p,
+                    name: updatedItemData.name,
+                    type: updatedItemData.materialType,
+                    code: updatedItemData.itemCode,
+                    patrimony: updatedItemData.materialType === 'permanente' ? updatedItemData.patrimony : 'N/A',
+                    unit: updatedItemData.unit,
+                    quantity: updatedItemData.quantity,
+                    category: updatedItemData.category,
+                };
+                if (updatedItemData.image instanceof File) {
+                    updatedProduct.imagePreview = URL.createObjectURL(updatedItemData.image);
+                }
+                return updatedProduct;
+            }
+            return p;
+        })
+    );
   };
+  
+  const handleDeleteItem = (productId: string) => {
+    setProducts(prevProducts => prevProducts.filter(p => p.id !== productId));
+    setItemToDelete(null);
+  };
+
 
   const handleEditClick = (product: any) => {
     setSelectedItem(product);
@@ -164,11 +218,11 @@ export default function InventoryPage() {
                     <TableRow key={product.id}>
                       <TableCell>
                         <Image
-                          src={product.image}
+                          src={product.imagePreview || product.image}
                           alt={product.name}
                           width={40}
                           height={40}
-                          className="rounded-md"
+                          className="rounded-md object-cover aspect-square"
                           data-ai-hint="product image"
                         />
                       </TableCell>
@@ -205,6 +259,11 @@ export default function InventoryPage() {
                               <Edit className="mr-2 h-4 w-4" />
                               <span>Editar Item</span>
                             </DropdownMenuItem>
+                             <DropdownMenuSeparator />
+                            <DropdownMenuItem className="text-red-600" onClick={() => setItemToDelete(product)}>
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              <span>Excluir</span>
+                            </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
@@ -228,6 +287,29 @@ export default function InventoryPage() {
           onItemUpdated={handleUpdateItem}
           item={selectedItem}
         />
+      )}
+       {itemToDelete && (
+        <AlertDialog open={!!itemToDelete} onOpenChange={() => setItemToDelete(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Essa ação não pode ser desfeita. Isso excluirá permanentemente o item
+                 <span className="font-semibold"> {itemToDelete.name} </span>
+                 do inventário.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => handleDeleteItem(itemToDelete.id)}
+                className="bg-red-600 hover:bg-red-700"
+              >
+                Sim, excluir
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       )}
     </>
   );
