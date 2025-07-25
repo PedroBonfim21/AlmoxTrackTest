@@ -29,6 +29,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { AddItemSheet } from "./components/add-item-sheet";
+import { EditItemSheet } from "./components/edit-item-sheet";
 
 
 const products = [
@@ -91,12 +92,24 @@ const products = [
 
 export default function InventoryPage() {
   const [searchTerm, setSearchTerm] = React.useState("");
-  const [isSheetOpen, setIsSheetOpen] = React.useState(false);
-  
+  const [isAddSheetOpen, setIsAddSheetOpen] = React.useState(false);
+  const [isEditSheetOpen, setIsEditSheetOpen] = React.useState(false);
+  const [selectedItem, setSelectedItem] = React.useState<any>(null);
+
   const handleAddItem = (newItem: any) => {
     console.log("New item added:", newItem);
     // Here you would typically update your state or make an API call
     // For now, we'll just log it to the console.
+  };
+  
+  const handleUpdateItem = (updatedItem: any) => {
+    console.log("Item updated:", updatedItem);
+    // Here you would typically update your state or make an API call
+  };
+
+  const handleEditClick = (product: any) => {
+    setSelectedItem(product);
+    setIsEditSheetOpen(true);
   };
 
   const filteredProducts = products.filter(
@@ -115,7 +128,7 @@ export default function InventoryPage() {
               Consulte e gira todos os itens em stock.
             </p>
           </div>
-          <Button onClick={() => setIsSheetOpen(true)}>
+          <Button onClick={() => setIsAddSheetOpen(true)}>
             <PlusCircle className="mr-2" />
             Adicionar Novo Item
           </Button>
@@ -188,7 +201,7 @@ export default function InventoryPage() {
                               <History className="mr-2 h-4 w-4" />
                               <span>Ver Movimentações</span>
                             </DropdownMenuItem>
-                            <DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleEditClick(product)}>
                               <Edit className="mr-2 h-4 w-4" />
                               <span>Editar Item</span>
                             </DropdownMenuItem>
@@ -204,10 +217,18 @@ export default function InventoryPage() {
         </Card>
       </div>
       <AddItemSheet 
-        isOpen={isSheetOpen}
-        onOpenChange={setIsSheetOpen}
+        isOpen={isAddSheetOpen}
+        onOpenChange={setIsAddSheetOpen}
         onItemAdded={handleAddItem}
       />
+      {selectedItem && (
+        <EditItemSheet
+          isOpen={isEditSheetOpen}
+          onOpenChange={setIsEditSheetOpen}
+          onItemUpdated={handleUpdateItem}
+          item={selectedItem}
+        />
+      )}
     </>
   );
 }
