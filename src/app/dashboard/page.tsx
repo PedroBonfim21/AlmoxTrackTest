@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -35,10 +36,10 @@ const COLORS = ["#4553a4", "#00acad", "#ffc20e"];
 
 export default function DashboardPage() {
     // Filter states
-    const [date, setDate] = React.useState<DateRange | undefined>({
-        from: new Date(new Date().setMonth(new Date().getMonth() - 1)),
-        to: new Date(),
-    });
+    const [startDate, setStartDate] = React.useState<Date | undefined>(
+        new Date(new Date().setMonth(new Date().getMonth() - 1))
+    );
+    const [endDate, setEndDate] = React.useState<Date | undefined>(new Date());
     const [movementType, setMovementType] = React.useState("all");
     const [materialType, setMaterialType] = React.useState("all");
 
@@ -49,13 +50,13 @@ export default function DashboardPage() {
         let newFilteredMovements = allMovements;
 
         // Date filter
-        if (date?.from && date?.to) {
+        if (startDate && endDate) {
             newFilteredMovements = newFilteredMovements.filter(m => {
                 const movementDate = new Date(m.date);
                 // Set hours to 0 to compare dates only
-                const fromDate = new Date(date.from!);
+                const fromDate = new Date(startDate!);
                 fromDate.setHours(0, 0, 0, 0);
-                const toDate = new Date(date.to!);
+                const toDate = new Date(endDate!);
                 toDate.setHours(23, 59, 59, 999);
                 return movementDate >= fromDate && movementDate <= toDate;
             });
@@ -188,65 +189,71 @@ export default function DashboardPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-                <Popover>
-                    <PopoverTrigger asChild>
-                    <Button
-                        id="date"
-                        variant={"outline"}
-                        className={cn(
-                        "w-full justify-start text-left font-normal col-span-1 lg:col-span-2",
-                        !date && "text-muted-foreground"
-                        )}
-                    >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {date?.from ? (
-                        date.to ? (
-                            <>
-                            {format(date.from, "P", { locale: ptBR })} -{" "}
-                            {format(date.to, "P", { locale: ptBR })}
-                            </>
-                        ) : (
-                            format(date.from, "P", { locale: ptBR })
-                        )
-                        ) : (
-                        <span>Selecione um período</span>
-                        )}
-                    </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                        initialFocus
-                        mode="range"
-                        defaultMonth={date?.from}
-                        selected={date}
-                        onSelect={setDate}
-                        numberOfMonths={2}
-                        locale={ptBR}
-                    />
-                    </PopoverContent>
-                </Popover>
-                <Select value={movementType} onValueChange={setMovementType}>
-                    <SelectTrigger>
-                        <SelectValue placeholder="Tipo de Movimentação" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="all">Todos os Tipos</SelectItem>
-                        <SelectItem value="Entrada">Entrada</SelectItem>
-                        <SelectItem value="Saída">Saída</SelectItem>
-                        <SelectItem value="Devolução">Devolução</SelectItem>
-                    </SelectContent>
-                </Select>
-                <Select value={materialType} onValueChange={setMaterialType}>
-                    <SelectTrigger>
-                        <SelectValue placeholder="Tipo de Material" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="all">Todos os Materiais</SelectItem>
-                        <SelectItem value="consumo">Consumo</SelectItem>
-                        <SelectItem value="permanente">Permanente</SelectItem>
-                    </SelectContent>
-                </Select>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
+                <div className="space-y-2">
+                    <label htmlFor="start-date" className="text-sm font-medium">Data de Início</label>
+                    <Popover>
+                        <PopoverTrigger asChild>
+                            <Button
+                                id="start-date"
+                                variant={"outline"}
+                                className={cn("w-full justify-start text-left font-normal",!startDate && "text-muted-foreground")}
+                            >
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {startDate ? format(startDate, "dd/MM/yyyy") : <span>Selecione uma data</span>}
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar mode="single" selected={startDate} onSelect={setStartDate} initialFocus locale={ptBR}/>
+                        </PopoverContent>
+                    </Popover>
+                </div>
+                <div className="space-y-2">
+                    <label htmlFor="end-date" className="text-sm font-medium">Data Final</label>
+                    <Popover>
+                        <PopoverTrigger asChild>
+                            <Button
+                                id="end-date"
+                                variant={"outline"}
+                                className={cn("w-full justify-start text-left font-normal",!endDate && "text-muted-foreground")}
+                            >
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {endDate ? format(endDate, "dd/MM/yyyy") : <span>Selecione uma data</span>}
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar mode="single" selected={endDate} onSelect={setEndDate} initialFocus locale={ptBR} />
+                        </PopoverContent>
+                    </Popover>
+                </div>
+
+                <div className="space-y-2">
+                    <label className="text-sm font-medium">Tipo de Movimentação</label>
+                    <Select value={movementType} onValueChange={setMovementType}>
+                        <SelectTrigger>
+                            <SelectValue placeholder="Tipo de Movimentação" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">Todos os Tipos</SelectItem>
+                            <SelectItem value="Entrada">Entrada</SelectItem>
+                            <SelectItem value="Saída">Saída</SelectItem>
+                            <SelectItem value="Devolução">Devolução</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+                <div className="space-y-2">
+                    <label className="text-sm font-medium">Tipo de Material</label>
+                    <Select value={materialType} onValueChange={setMaterialType}>
+                        <SelectTrigger>
+                            <SelectValue placeholder="Tipo de Material" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">Todos os Materiais</SelectItem>
+                            <SelectItem value="consumo">Consumo</SelectItem>
+                            <SelectItem value="permanente">Permanente</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
                 <Button onClick={handleApplyFilters} className="w-full">Aplicar Filtros</Button>
             </div>
         </CardContent>
