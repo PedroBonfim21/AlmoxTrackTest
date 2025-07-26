@@ -64,6 +64,7 @@ export default function ExitPage() {
     // State for Consumption Tab
     const [requestDate, setRequestDate] = React.useState<Date | undefined>(new Date());
     const [requesterName, setRequesterName] = React.useState("");
+    const [requesterId, setRequesterId] = React.useState("");
     const [department, setDepartment] = React.useState("");
     const [purpose, setPurpose] = React.useState("");
     const [consumptionSearchTerm, setConsumptionSearchTerm] = React.useState("");
@@ -75,6 +76,7 @@ export default function ExitPage() {
     // State for Responsibility Tab
     const [responsibilityDate, setResponsibilityDate] = React.useState<Date | undefined>(new Date());
     const [responsibleName, setResponsibleName] = React.useState("");
+    const [responsibleId, setResponsibleId] = React.useState("");
     const [responsibilityDepartment, setResponsibilityDepartment] = React.useState("");
     const [projectDescription, setProjectDescription] = React.useState("");
     const [responsibilitySearchTerm, setResponsibilitySearchTerm] = React.useState("");
@@ -190,6 +192,11 @@ export default function ExitPage() {
             toast({ title: "Nenhum item solicitado", description: "Adicione pelo menos um item para registrar a saída.", variant: "destructive" });
             return;
         }
+
+        if (!requesterName || !requesterId || !department) {
+            toast({ title: "Campos obrigatórios", description: "Por favor, preencha o nome, matrícula e setor do solicitante.", variant: "destructive" });
+            return;
+        }
         
         requestedItems.forEach(item => {
             const productIndex = allProducts.findIndex(p => p.id === item.id);
@@ -201,7 +208,7 @@ export default function ExitPage() {
                 date: new Date().toISOString(),
                 type: 'Saída',
                 quantity: item.quantity,
-                responsible: 'sdpinho29' // Mock user
+                responsible: requesterName
             });
         });
         
@@ -210,6 +217,7 @@ export default function ExitPage() {
         // Reset form
         setRequestDate(new Date());
         setRequesterName("");
+        setRequesterId("");
         setDepartment("");
         setPurpose("");
         setRequestedItems([]);
@@ -220,11 +228,16 @@ export default function ExitPage() {
             toast({ title: "Nenhum item adicionado", description: "Adicione pelo menos um item para gerar o termo.", variant: "destructive" });
             return;
         }
+        if (!responsibleName || !responsibleId || !responsibilityDepartment) {
+            toast({ title: "Campos obrigatórios", description: "Por favor, preencha o nome, matrícula e setor do responsável.", variant: "destructive" });
+            return;
+        }
         setIsTermAccepted(false);
         setIsConfirmDialogOpen(true);
     };
-    
-    const confirmFinalizeResponsibility = () => {
+
+    const handlePrintAndFinalize = () => {
+        // Finalize the stock removal
         responsibilityItems.forEach(item => {
             const productIndex = allProducts.findIndex(p => p.id === item.id);
             if (productIndex !== -1) {
@@ -235,21 +248,26 @@ export default function ExitPage() {
                 date: new Date().toISOString(),
                 type: 'Saída',
                 quantity: item.quantity,
-                responsible: responsibleName || 'sdpinho29' // Mock user
+                responsible: responsibleName
             });
         });
 
-        toast({ title: "Termo de Responsabilidade Gerado!", description: "A saída de material permanente foi registrada com sucesso." });
+        toast({ title: "Termo Gerado e Saída Registrada!", description: "A saída de material permanente foi registrada com sucesso." });
+        
+        // Trigger browser print dialog
+        setTimeout(() => {
+            window.print();
+        }, 100);
 
-        // Reset form
+        // Reset form after printing
+        setIsConfirmDialogOpen(false);
         setResponsibilityDate(new Date());
         setResponsibleName("");
+        setResponsibleId("");
         setResponsibilityDepartment("");
         setProjectDescription("");
         setResponsibilityItems([]);
-        setIsConfirmDialogOpen(false);
     };
-
 
     return (
         <div className="flex flex-col gap-6">
@@ -288,9 +306,13 @@ export default function ExitPage() {
                                         <Input id="requester-name" value={requesterName} onChange={e => setRequesterName(e.target.value)} />
                                     </div>
                                     <div className="space-y-2">
+                                        <label htmlFor="requester-id" className="text-sm font-medium">Matrícula do Solicitante</label>
+                                        <Input id="requester-id" value={requesterId} onChange={e => setRequesterId(e.target.value)} />
+                                    </div>
+                                </div>
+                                <div className="space-y-2">
                                         <label htmlFor="department" className="text-sm font-medium">Setor/Departamento</label>
                                         <Input id="department" value={department} onChange={e => setDepartment(e.target.value)} />
-                                    </div>
                                 </div>
                                 <div className="space-y-2">
                                     <label htmlFor="purpose" className="text-sm font-medium">Finalidade de Uso</label>
@@ -413,9 +435,13 @@ export default function ExitPage() {
                                         <Input id="responsible-name" value={responsibleName} onChange={e => setResponsibleName(e.target.value)} />
                                     </div>
                                     <div className="space-y-2">
-                                        <label htmlFor="responsibility-department" className="text-sm font-medium">Setor/Departamento</label>
-                                        <Input id="responsibility-department" value={responsibilityDepartment} onChange={e => setResponsibilityDepartment(e.target.value)} />
+                                        <label htmlFor="responsible-id" className="text-sm font-medium">Matrícula</label>
+                                        <Input id="responsible-id" value={responsibleId} onChange={e => setResponsibleId(e.target.value)} />
                                     </div>
+                                </div>
+                                 <div className="space-y-2">
+                                    <label htmlFor="responsibility-department" className="text-sm font-medium">Setor/Departamento</label>
+                                    <Input id="responsibility-department" value={responsibilityDepartment} onChange={e => setResponsibilityDepartment(e.target.value)} />
                                 </div>
                                 <div className="space-y-2">
                                     <label htmlFor="project-description" className="text-sm font-medium">Descrição de Uso ou Projeto</label>
@@ -513,15 +539,15 @@ export default function ExitPage() {
             </Tabs>
              {isConfirmDialogOpen && (
                 <AlertDialog open={isConfirmDialogOpen} onOpenChange={setIsConfirmDialogOpen}>
-                    <AlertDialogContent className="max-w-3xl">
+                    <AlertDialogContent className="max-w-3xl print:max-w-full print:border-none print:shadow-none">
                         <AlertDialogHeader>
-                            <AlertDialogTitle className="text-center text-xl">
+                            <AlertDialogTitle className="text-center text-xl font-bold">
                                 TERMO DE RESPONSABILIDADE DE MATERIAIS PERMANENTES
                             </AlertDialogTitle>
                         </AlertDialogHeader>
-                        <div className="text-sm text-justify space-y-4 p-4 border rounded-md bg-white">
+                        <div className="text-sm text-justify space-y-4 p-4 border rounded-md bg-white print:border-none print:p-0">
                             <p>
-                                Pelo presente termo, eu, <strong>{responsibleName || '[NOME DO SERVIDOR]'}</strong>, matrícula nº <strong>[XXX]</strong>, servidor(a) da Secretaria Municipal de <strong>{responsibilityDepartment || '[NOME DA SECRETARIA]'}</strong>, assumo a responsabilidade pelo recebimento e guarda dos materiais permanentes abaixo descritos, destinados ao uso exclusivo nas atividades institucionais.
+                                Pelo presente termo, eu, <strong>{responsibleName || '[NOME DO SERVIDOR]'}</strong>, matrícula nº <strong>{responsibleId || '[MATRÍCULA]'}</strong>, servidor(a) da Secretaria Municipal de <strong>{responsibilityDepartment || '[NOME DA SECRETARIA]'}</strong>, assumo a responsabilidade pelo recebimento e guarda dos materiais permanentes abaixo descritos, destinados ao uso exclusivo nas atividades institucionais.
                             </p>
 
                             <Table>
@@ -561,27 +587,44 @@ export default function ExitPage() {
                             </div>
 
                             <div className="flex justify-around pt-12 text-center text-xs">
-                                <div className="border-t w-1/4">Assinatura do Responsável pelo Setor</div>
-                                <div className="border-t w-1/4">Assinatura do Servidor Responsável</div>
-                                <div className="border-t w-1/4">Assinatura do Almoxarife/Patrimônio</div>
+                                <div className="border-t w-1/4 pt-2">Assinatura do Responsável pelo Setor</div>
+                                <div className="border-t w-1/4 pt-2">Assinatura do Servidor Responsável</div>
+                                <div className="border-t w-1/4 pt-2">Assinatura do Almoxarife/Patrimônio</div>
                             </div>
                             
                         </div>
-                        <div className="flex items-center space-x-2 pt-4">
+                        <div className="flex items-center space-x-2 pt-4 print:hidden">
                             <Checkbox id="terms" checked={isTermAccepted} onCheckedChange={(checked) => setIsTermAccepted(checked as boolean)} />
                             <Label htmlFor="terms" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
                                 Declaro que li e concordo com os termos de responsabilidade.
                             </Label>
                          </div>
-                        <AlertDialogFooter>
-                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                            <AlertDialogAction onClick={confirmFinalizeResponsibility} disabled={!isTermAccepted}>
-                                Confirmar Termo
+                        <AlertDialogFooter className="print:hidden">
+                            <AlertDialogCancel onClick={() => setIsConfirmDialogOpen(false)}>Sair</AlertDialogCancel>
+                            <AlertDialogAction onClick={handlePrintAndFinalize} disabled={!isTermAccepted}>
+                                Imprimir
                             </AlertDialogAction>
                         </AlertDialogFooter>
                     </AlertDialogContent>
                 </AlertDialog>
             )}
+            <style jsx global>{`
+                @media print {
+                    body > *:not(.print-container) {
+                        display: none;
+                    }
+                    .print-container {
+                        display: block;
+                        position: absolute;
+                        left: 0;
+                        top: 0;
+                        width: 100%;
+                    }
+                    main {
+                        padding: 0 !important;
+                    }
+                }
+            `}</style>
         </div>
     );
 }
