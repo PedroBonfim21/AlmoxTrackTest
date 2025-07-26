@@ -59,10 +59,9 @@ export default function DashboardPage() {
   const [allMovements, setAllMovements] = React.useState<Movement[]>([]);
   const [filteredMovements, setFilteredMovements] = React.useState<Movement[]>([]);
   
-  const [date, setDate] = React.useState<DateRange | undefined>({
-    from: subDays(new Date(), 29),
-    to: new Date(),
-  });
+  const [startDate, setStartDate] = React.useState<Date | undefined>(subDays(new Date(), 29));
+  const [endDate, setEndDate] = React.useState<Date | undefined>(new Date());
+  
   const [movementType, setMovementType] = React.useState("all");
   const [materialType, setMaterialType] = React.useState("all");
   const [department, setDepartment] = React.useState("all");
@@ -95,14 +94,14 @@ export default function DashboardPage() {
     let newFilteredMovements = allMovements;
 
     // Filter by date
-    if (date?.from && date?.to) {
+    if (startDate && endDate) {
         newFilteredMovements = newFilteredMovements.filter(m => {
             const movementDate = parseISO(m.date);
             if (!isValid(movementDate)) return false;
             // Set time to beginning of the day for `from` and end of the day for `to`
-            const fromDate = new Date(date.from!);
+            const fromDate = new Date(startDate!);
             fromDate.setHours(0, 0, 0, 0);
-            const toDate = new Date(date.to!);
+            const toDate = new Date(endDate!);
             toDate.setHours(23, 59, 59, 999);
             return movementDate >= fromDate && movementDate <= toDate;
         });
@@ -133,7 +132,7 @@ export default function DashboardPage() {
     }
 
     setFilteredMovements(newFilteredMovements);
-  }, [allMovements, date, movementType, materialType, department, products]);
+  }, [allMovements, startDate, endDate, movementType, materialType, department, products]);
 
   // Run on mount and when filters change
   React.useEffect(() => {
@@ -263,84 +262,110 @@ export default function DashboardPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Filtros Dinâmicos</CardTitle>
+          <CardTitle>Filtros</CardTitle>
           <CardDescription>
             Use os filtros para analisar os dados do inventário.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  id="date"
-                  variant={"outline"}
-                  className={cn(
-                    "w-full justify-start text-left font-normal",
-                    !date && "text-muted-foreground"
-                  )}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {date?.from ? (
-                    date.to ? (
-                      <>
-                        {format(date.from, "LLL dd, y")} -{" "}
-                        {format(date.to, "LLL dd, y")}
-                      </>
-                    ) : (
-                      format(date.from, "LLL dd, y")
-                    )
-                  ) : (
-                    <span>Selecione o período</span>
-                  )}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  initialFocus
-                  mode="range"
-                  defaultMonth={date?.from}
-                  selected={date}
-                  onSelect={setDate}
-                  numberOfMonths={2}
-                  locale={ptBR}
-                />
-              </PopoverContent>
-            </Popover>
-            <Select value={movementType} onValueChange={setMovementType}>
-              <SelectTrigger>
-                <SelectValue placeholder="Tipo de Movimento" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos Movimentos</SelectItem>
-                <SelectItem value="Entrada">Entrada</SelectItem>
-                <SelectItem value="Saída">Saída</SelectItem>
-                <SelectItem value="Devolução">Devolução</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={materialType} onValueChange={setMaterialType}>
-              <SelectTrigger>
-                <SelectValue placeholder="Tipo de Material" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos Tipos</SelectItem>
-                <SelectItem value="consumo">Consumo</SelectItem>
-                <SelectItem value="permanente">Permanente</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={department} onValueChange={setDepartment}>
-              <SelectTrigger>
-                <SelectValue placeholder="Setor" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos Setores</SelectItem>
-                {uniqueDepartments.map((dep) => (
-                  <SelectItem key={dep} value={dep}>
-                    {dep}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 items-end">
+            <div className="space-y-2">
+              <label htmlFor="start-date" className="text-sm font-medium">Data de Início</label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    id="start-date"
+                    variant={"outline"}
+                    className={cn(
+                      "w-full justify-start text-left font-normal",
+                      !startDate && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {startDate ? format(startDate, "dd/MM/yyyy") : <span>Selecione a data</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={startDate}
+                    onSelect={setStartDate}
+                    initialFocus
+                    locale={ptBR}
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+             <div className="space-y-2">
+                <label htmlFor="end-date" className="text-sm font-medium">Data Final</label>
+                <Popover>
+                    <PopoverTrigger asChild>
+                    <Button
+                        id="end-date"
+                        variant={"outline"}
+                        className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !endDate && "text-muted-foreground"
+                        )}
+                    >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {endDate ? format(endDate, "dd/MM/yyyy") : <span>Selecione a data</span>}
+                    </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                        mode="single"
+                        selected={endDate}
+                        onSelect={setEndDate}
+                        initialFocus
+                        locale={ptBR}
+                    />
+                    </PopoverContent>
+                </Popover>
+            </div>
+            <div className="space-y-2">
+                <label className="text-sm font-medium">Tipo de Movimento</label>
+                <Select value={movementType} onValueChange={setMovementType}>
+                <SelectTrigger>
+                    <SelectValue placeholder="Tipo de Movimento" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="all">Todos Movimentos</SelectItem>
+                    <SelectItem value="Entrada">Entrada</SelectItem>
+                    <SelectItem value="Saída">Saída</SelectItem>
+                    <SelectItem value="Devolução">Devolução</SelectItem>
+                </SelectContent>
+                </Select>
+            </div>
+            <div className="space-y-2">
+                <label className="text-sm font-medium">Tipo de Material</label>
+                <Select value={materialType} onValueChange={setMaterialType}>
+                <SelectTrigger>
+                    <SelectValue placeholder="Tipo de Material" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="all">Todos Tipos</SelectItem>
+                    <SelectItem value="consumo">Consumo</SelectItem>
+                    <SelectItem value="permanente">Permanente</SelectItem>
+                </SelectContent>
+                </Select>
+            </div>
+            <div className="space-y-2">
+                <label className="text-sm font-medium">Setor</label>
+                <Select value={department} onValueChange={setDepartment}>
+                <SelectTrigger>
+                    <SelectValue placeholder="Setor" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="all">Todos Setores</SelectItem>
+                    {uniqueDepartments.map((dep) => (
+                    <SelectItem key={dep} value={dep}>
+                        {dep}
+                    </SelectItem>
+                    ))}
+                </SelectContent>
+                </Select>
+            </div>
           </div>
         </CardContent>
       </Card>
