@@ -54,7 +54,7 @@ export default function DashboardLayout({
     { href: "/dashboard/inventory", icon: Package, label: "Inventário" },
     { href: "/dashboard/entry", icon: ArrowRightToLine, label: "Entrada" },
     { href: "/dashboard/exit", icon: ArrowLeftFromLine, label: "Saída" },
-    { href: "#", icon: ChevronsLeftRight, label: "Devolução" },
+    { href: "/dashboard/returns", icon: ChevronsLeftRight, label: "Devolução" },
   ];
 
   return (
