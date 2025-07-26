@@ -48,7 +48,6 @@ const currentUserRole = "Operator";
 
 export default function EntryPage() {
     const { toast } = useToast();
-    const [allProducts, setAllProducts] = React.useState<Product[]>([]);
     const [entryDate, setEntryDate] = React.useState<Date | undefined>(new Date());
     const [supplier, setSupplier] = React.useState("");
     const [invoice, setInvoice] = React.useState("");
@@ -65,13 +64,16 @@ export default function EntryPage() {
     const [isFinalizing, setIsFinalizing] = React.useState(false);
 
     const fetchProducts = React.useCallback(async (term: string) => {
+        if (term.length < 2) {
+            setSearchResults([]);
+            setIsSearchOpen(false);
+            return;
+        }
         setIsLoading(true);
         try {
             const productsFromDb = await getProducts({ searchTerm: term });
             setSearchResults(productsFromDb);
-            if (productsFromDb.length > 0) {
-                setIsSearchOpen(true);
-            }
+            setIsSearchOpen(productsFromDb.length > 0);
         } catch (error) {
             toast({
                 title: "Erro ao Buscar Produtos",
@@ -85,12 +87,7 @@ export default function EntryPage() {
 
     React.useEffect(() => {
         const handler = setTimeout(() => {
-            if (searchTerm.trim().length > 1) {
-                fetchProducts(searchTerm.trim());
-            } else {
-                setSearchResults([]);
-                setIsSearchOpen(false);
-            }
+            fetchProducts(searchTerm);
         }, 500); // Debounce search
 
         return () => {
@@ -99,19 +96,9 @@ export default function EntryPage() {
     }, [searchTerm, fetchProducts]);
     
     const refreshLocalProductList = React.useCallback(async () => {
-        try {
-            // This could be optimized to not fetch all products again
-            // For now, it ensures the local list is up-to-date
-            const productsFromDb = await getProducts();
-            setAllProducts(productsFromDb);
-        } catch (error) {
-            toast({
-                title: "Erro ao Atualizar Lista",
-                description: "Não foi possível atualizar a lista de produtos.",
-                variant: "destructive",
-            });
-        }
-    }, [toast]);
+        // This function might not be necessary if the main product list is always fresh.
+        // For now, it's a placeholder if we need to force a full refresh.
+    }, []);
 
     const handleSelectSearchItem = (item: Product) => {
         setSearchTerm(item.name);
@@ -121,17 +108,23 @@ export default function EntryPage() {
     const handleSearchOrAddItem = async () => {
         if (!searchTerm) return;
         
-        // Ensure we have the latest product list before checking existence
-        const currentProducts = await getProducts({searchTerm});
-        const existingItem = currentProducts.find(item => item.name.toLowerCase() === searchTerm.toLowerCase());
-        
-        if (existingItem) {
-            handleAddToList(existingItem);
+        // Find the selected item from the search results
+        const selectedItem = searchResults.find(item => item.name.toLowerCase() === searchTerm.toLowerCase());
+
+        if (selectedItem) {
+            handleAddToList(selectedItem);
         } else {
-            if (currentUserRole === 'Operator') {
-                setIsAuthDialogOpen(true);
+            // If not found in results, check if it's a new item
+            const currentProducts = await getProducts({searchTerm});
+            const existingItem = currentProducts.find(item => item.name.toLowerCase() === searchTerm.toLowerCase());
+            if (existingItem) {
+                 handleAddToList(existingItem);
             } else {
-                setIsAddItemSheetOpen(true);
+                 if (currentUserRole === 'Operator') {
+                    setIsAuthDialogOpen(true);
+                } else {
+                    setIsAddItemSheetOpen(true);
+                }
             }
         }
     };
@@ -155,6 +148,8 @@ export default function EntryPage() {
         });
         setSearchTerm("");
         setQuantity(1);
+        setSearchResults([]);
+        setIsSearchOpen(false);
     };
 
     const handleRemoveFromList = (itemId: string) => {
@@ -182,8 +177,6 @@ export default function EntryPage() {
             
             const newProductId = await addProduct(newProductData);
             const newProductWithId = { ...newProductData, id: newProductId };
-            
-            await refreshLocalProductList();
             
             toast({
                 title: "Item Adicionado!",
@@ -242,8 +235,6 @@ export default function EntryPage() {
                 responsible: 'sdpinho29' // Mock responsible user
             });
             
-            await refreshLocalProductList();
-            
             toast({
                 title: "Entrada Registrada!",
                 description: "A entrada de materiais foi registrada com sucesso.",
@@ -293,7 +284,7 @@ export default function EntryPage() {
                                 )}
                             >
                                 <CalendarIcon className="mr-2 h-4 w-4" />
-                                {entryDate ? format(entryDate, "dd/MM/yyyy") : <span>Selecione uma data</span>}
+                                {entryDate ? format(entryDate, "dd/MM/yyyy", { locale: ptBR }) : <span>Selecione uma data</span>}
                             </Button>
                             </PopoverTrigger>
                             <PopoverContent className="w-auto p-0">
@@ -418,5 +409,3 @@ export default function EntryPage() {
     </>
   );
 }
-
-    
