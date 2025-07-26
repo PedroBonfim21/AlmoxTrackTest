@@ -236,7 +236,8 @@ export default function ExitPage() {
         setIsConfirmDialogOpen(true);
     };
 
-    const handlePrintAndFinalize = () => {
+    const handlePrintAndFinalize = (e: React.MouseEvent<HTMLButtonElement>) => {
+        e.preventDefault();
         // Finalize the stock removal
         responsibilityItems.forEach(item => {
             const productIndex = allProducts.findIndex(p => p.id === item.id);
@@ -257,16 +258,16 @@ export default function ExitPage() {
         // Trigger browser print dialog
         setTimeout(() => {
             window.print();
+            
+            // Reset form after printing
+            setIsConfirmDialogOpen(false);
+            setResponsibilityDate(new Date());
+            setResponsibleName("");
+            setResponsibleId("");
+            setResponsibilityDepartment("");
+            setProjectDescription("");
+            setResponsibilityItems([]);
         }, 100);
-
-        // Reset form after printing
-        setIsConfirmDialogOpen(false);
-        setResponsibilityDate(new Date());
-        setResponsibleName("");
-        setResponsibleId("");
-        setResponsibilityDepartment("");
-        setProjectDescription("");
-        setResponsibilityItems([]);
     };
 
     return (
@@ -537,83 +538,85 @@ export default function ExitPage() {
                     </Card>
                 </TabsContent>
             </Tabs>
-             {isConfirmDialogOpen && (
-                <AlertDialog open={isConfirmDialogOpen} onOpenChange={setIsConfirmDialogOpen}>
-                    <AlertDialogContent className="max-w-3xl print:max-w-full print:border-none print:shadow-none">
-                        <AlertDialogHeader>
-                            <AlertDialogTitle className="text-center text-xl font-bold">
-                                TERMO DE RESPONSABILIDADE DE MATERIAIS PERMANENTES
-                            </AlertDialogTitle>
-                        </AlertDialogHeader>
-                        <div className="text-sm text-justify space-y-4 p-4 border rounded-md bg-white print:border-none print:p-0">
-                            <p>
-                                Pelo presente termo, eu, <strong>{responsibleName || '[NOME DO SERVIDOR]'}</strong>, matrícula nº <strong>{responsibleId || '[MATRÍCULA]'}</strong>, servidor(a) da Secretaria Municipal de <strong>{responsibilityDepartment || '[NOME DA SECRETARIA]'}</strong>, assumo a responsabilidade pelo recebimento e guarda dos materiais permanentes abaixo descritos, destinados ao uso exclusivo nas atividades institucionais.
-                            </p>
+             <div id="print-container">
+                {isConfirmDialogOpen && (
+                    <AlertDialog open={isConfirmDialogOpen} onOpenChange={setIsConfirmDialogOpen}>
+                        <AlertDialogContent className="max-w-3xl print:max-w-full print:border-none print:shadow-none">
+                            <AlertDialogHeader>
+                                <AlertDialogTitle className="text-center text-xl font-bold">
+                                    TERMO DE RESPONSABILIDADE DE MATERIAIS PERMANENTES
+                                </AlertDialogTitle>
+                            </AlertDialogHeader>
+                            <div className="text-sm text-justify space-y-4 p-4 border rounded-md bg-white print:border-none print:p-0">
+                                <p>
+                                    Pelo presente termo, eu, <strong>{responsibleName || '[NOME DO SERVIDOR]'}</strong>, matrícula nº <strong>{responsibleId || '[MATRÍCULA]'}</strong>, servidor(a) da Secretaria Municipal de <strong>{responsibilityDepartment || '[NOME DA SECRETARIA]'}</strong>, assumo a responsabilidade pelo recebimento e guarda dos materiais permanentes abaixo descritos, destinados ao uso exclusivo nas atividades institucionais.
+                                </p>
 
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Nº Patrimonial</TableHead>
-                                        <TableHead>Descrição do Bem</TableHead>
-                                        <TableHead>Marca/Modelo</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {responsibilityItems.map(reqItem => {
-                                        const product = allProducts.find(p => p.id === reqItem.id);
-                                        return (
-                                            <TableRow key={reqItem.id}>
-                                                <TableCell>{product?.patrimony || 'N/A'}</TableCell>
-                                                <TableCell>{reqItem.name}</TableCell>
-                                                <TableCell>N/A</TableCell>
-                                            </TableRow>
-                                        );
-                                    })}
-                                </TableBody>
-                            </Table>
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Nº Patrimonial</TableHead>
+                                            <TableHead>Descrição do Bem</TableHead>
+                                            <TableHead>Marca/Modelo</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {responsibilityItems.map(reqItem => {
+                                            const product = allProducts.find(p => p.id === reqItem.id);
+                                            return (
+                                                <TableRow key={reqItem.id}>
+                                                    <TableCell>{product?.patrimony || 'N/A'}</TableCell>
+                                                    <TableCell>{reqItem.name}</TableCell>
+                                                    <TableCell>N/A</TableCell>
+                                                </TableRow>
+                                            );
+                                        })}
+                                    </TableBody>
+                                </Table>
 
-                            <div>
-                                <h3 className="font-semibold mb-2">Declaro estar ciente de que:</h3>
-                                <ul className="list-disc list-inside space-y-1 text-xs">
-                                    <li>É vedada a utilização do bem para fins particulares.</li>
-                                    <li>Sou responsável pela guarda, conservação e uso adequado.</li>
-                                    <li>Em caso de extravio, dano ou mau uso, devo comunicar imediatamente ao setor competente.</li>
-                                    <li>Este termo deverá ser renovado em caso de transferência de setor, baixa patrimonial ou substituição do bem.</li>
-                                </ul>
+                                <div>
+                                    <h3 className="font-semibold mb-2">Declaro estar ciente de que:</h3>
+                                    <ul className="list-disc list-inside space-y-1 text-xs">
+                                        <li>É vedada a utilização do bem para fins particulares.</li>
+                                        <li>Sou responsável pela guarda, conservação e uso adequado.</li>
+                                        <li>Em caso de extravio, dano ou mau uso, devo comunicar imediatamente ao setor competente.</li>
+                                        <li>Este termo deverá ser renovado em caso de transferência de setor, baixa patrimonial ou substituição do bem.</li>
+                                    </ul>
+                                </div>
+
+                                <div className="pt-4">
+                                    <p>Local e Data: __________, {format(new Date(), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}</p>
+                                </div>
+
+                                <div className="flex justify-around pt-12 text-center text-xs">
+                                    <div className="border-t w-1/4 pt-2">Assinatura do Responsável pelo Setor</div>
+                                    <div className="border-t w-1/4 pt-2">Assinatura do Servidor Responsável</div>
+                                    <div className="border-t w-1/4 pt-2">Assinatura do Almoxarife/Patrimônio</div>
+                                </div>
+                                
                             </div>
-
-                            <div className="pt-4">
-                                <p>Local e Data: __________, {format(new Date(), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}</p>
-                            </div>
-
-                            <div className="flex justify-around pt-12 text-center text-xs">
-                                <div className="border-t w-1/4 pt-2">Assinatura do Responsável pelo Setor</div>
-                                <div className="border-t w-1/4 pt-2">Assinatura do Servidor Responsável</div>
-                                <div className="border-t w-1/4 pt-2">Assinatura do Almoxarife/Patrimônio</div>
-                            </div>
-                            
-                        </div>
-                        <div className="flex items-center space-x-2 pt-4 print:hidden">
-                            <Checkbox id="terms" checked={isTermAccepted} onCheckedChange={(checked) => setIsTermAccepted(checked as boolean)} />
-                            <Label htmlFor="terms" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                                Declaro que li e concordo com os termos de responsabilidade.
-                            </Label>
-                         </div>
-                        <AlertDialogFooter className="print:hidden">
-                            <AlertDialogCancel onClick={() => setIsConfirmDialogOpen(false)}>Sair</AlertDialogCancel>
-                            <AlertDialogAction onClick={handlePrintAndFinalize} disabled={!isTermAccepted}>
-                                Imprimir
-                            </AlertDialogAction>
-                        </AlertDialogFooter>
-                    </AlertDialogContent>
-                </AlertDialog>
-            )}
+                            <div className="flex items-center space-x-2 pt-4 print:hidden">
+                                <Checkbox id="terms" checked={isTermAccepted} onCheckedChange={(checked) => setIsTermAccepted(checked as boolean)} />
+                                <Label htmlFor="terms" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                                    Declaro que li e concordo com os termos de responsabilidade.
+                                </Label>
+                             </div>
+                            <AlertDialogFooter className="print:hidden">
+                                <AlertDialogCancel onClick={() => setIsConfirmDialogOpen(false)}>Sair</AlertDialogCancel>
+                                <AlertDialogAction onClick={handlePrintAndFinalize} disabled={!isTermAccepted}>
+                                    Imprimir
+                                </AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
+                )}
+            </div>
             <style jsx global>{`
                 @media print {
-                    body > *:not(.print-container) {
+                    body > *:not(#print-container) {
                         display: none;
                     }
-                    .print-container {
+                    #print-container {
                         display: block;
                         position: absolute;
                         left: 0;
@@ -622,6 +625,10 @@ export default function ExitPage() {
                     }
                     main {
                         padding: 0 !important;
+                        margin: 0 !important;
+                    }
+                    .print-container-content {
+                        padding: 2rem; /* Add some padding for the print layout */
                     }
                 }
             `}</style>
