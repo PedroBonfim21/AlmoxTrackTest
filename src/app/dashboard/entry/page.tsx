@@ -34,7 +34,7 @@ import { AdminAuthDialog } from "./components/admin-auth-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import type { Product } from "@/lib/firestore";
-import { getProducts, addProduct, addMovement, updateProduct } from "@/lib/firestore";
+import { getProducts, addProduct, finalizeEntry } from "@/lib/firestore";
 
 type ReceivedItem = {
     id: string;
@@ -62,16 +62,18 @@ export default function EntryPage() {
     const [isAddItemSheetOpen, setIsAddItemSheetOpen] = React.useState(false);
     const [isAuthDialogOpen, setIsAuthDialogOpen] = React.useState(false);
     const [isLoading, setIsLoading] = React.useState(true);
+    const [isFinalizing, setIsFinalizing] = React.useState(false);
+
+    const fetchProducts = React.useCallback(async () => {
+        setIsLoading(true);
+        const productsFromDb = await getProducts();
+        setAllProducts(productsFromDb);
+        setIsLoading(false);
+    }, []);
 
     React.useEffect(() => {
-        const fetchProducts = async () => {
-            setIsLoading(true);
-            const productsFromDb = await getProducts();
-            setAllProducts(productsFromDb);
-            setIsLoading(false);
-        };
         fetchProducts();
-    }, []);
+    }, [fetchProducts]);
 
     React.useEffect(() => {
        if (searchTerm.trim()) {
@@ -134,6 +136,7 @@ export default function EntryPage() {
     };
 
     const handleItemAdded = async (newItemData: any) => {
+        setIsLoading(true);
         const newProductData: Omit<Product, 'id'> = {
             name: newItemData.name,
             code: newItemData.itemCode || `new-${Date.now()}`,
@@ -147,6 +150,7 @@ export default function EntryPage() {
         
         const newProductId = await addProduct(newProductData);
         const newProductWithId = { ...newProductData, id: newProductId };
+        
         setAllProducts(prev => [...prev, newProductWithId]);
         
         toast({
@@ -157,6 +161,7 @@ export default function EntryPage() {
         if (newItemData.initialQuantity > 0) {
             setReceivedItems(prev => [...prev, { id: newProductWithId.id, name: newProductWithId.name, quantity: newItemData.initialQuantity, unit: newProductWithId.unit }]);
         }
+        setIsLoading(false);
     };
 
     const handleAuthSuccess = () => {
@@ -173,26 +178,26 @@ export default function EntryPage() {
             });
             return;
         }
+        if (!supplier || !invoice) {
+            toast({
+                title: "Campos obrigatórios",
+                description: "Preencha o fornecedor e a nota fiscal/processo.",
+                variant: "destructive"
+            });
+            return;
+        }
         
+        setIsFinalizing(true);
         try {
-            for (const item of receivedItems) {
-                const product = allProducts.find(p => p.id === item.id);
-                if (product) {
-                    const newQuantity = product.quantity + item.quantity;
-                    await updateProduct(item.id, { quantity: newQuantity });
-                    await addMovement({
-                        productId: item.id,
-                        date: new Date().toISOString(),
-                        type: 'Entrada',
-                        quantity: item.quantity,
-                        responsible: 'sdpinho29' // Mock responsible user
-                    });
-                }
-            }
+            await finalizeEntry({
+                items: receivedItems,
+                date: entryDate?.toISOString() || new Date().toISOString(),
+                supplier: supplier,
+                invoice: invoice,
+                responsible: 'sdpinho29' // Mock responsible user
+            });
             
-            // Refetch products to get updated quantities
-            const updatedProducts = await getProducts();
-            setAllProducts(updatedProducts);
+            await fetchProducts();
             
             toast({
                 title: "Entrada Registrada!",
@@ -210,10 +215,12 @@ export default function EntryPage() {
                 description: "Não foi possível registrar a entrada. Tente novamente.",
                 variant: "destructive"
             });
+        } finally {
+            setIsFinalizing(false);
         }
     };
 
-  if (isLoading) {
+  if (isLoading && !isFinalizing) {
     return (
         <div className="flex justify-center items-center h-full">
             <p>Carregando dados...</p>
@@ -356,8 +363,8 @@ export default function EntryPage() {
             </CardContent>
         </Card>
          <div className="flex justify-end">
-            <Button variant="accent" size="lg" onClick={handleFinalizeEntry}>
-                Finalizar Entrada
+            <Button variant="accent" size="lg" onClick={handleFinalizeEntry} disabled={isFinalizing}>
+                {isFinalizing ? "Finalizando..." : "Finalizar Entrada"}
             </Button>
         </div>
       </div>

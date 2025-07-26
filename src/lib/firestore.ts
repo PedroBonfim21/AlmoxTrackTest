@@ -24,11 +24,22 @@ export type Movement = {
     quantity: number;
     responsible: string;
     department?: string;
+    supplier?: string;
+    invoice?: string;
 };
+
+type EntryData = {
+    items: { id: string; quantity: number }[];
+    date: string;
+    supplier: string;
+    invoice: string;
+    responsible: string;
+}
 
 
 // Product Functions
 const productsCollection = collection(db, 'products');
+const movementsCollection = collection(db, 'movements');
 
 export const getProducts = async (): Promise<Product[]> => {
     const snapshot = await getDocs(productsCollection);
@@ -45,41 +56,49 @@ export const updateProduct = async (productId: string, productData: Partial<Prod
     await updateDoc(productDoc, productData);
 };
 
-export const updateProductQuantityOnEntry = async (productId: string, quantity: number): Promise<void> => {
-    const productRef = doc(db, "products", productId);
+export const finalizeEntry = async (entryData: EntryData): Promise<void> => {
     try {
         await runTransaction(db, async (transaction) => {
-            const productDoc = await transaction.get(productRef);
-            if (!productDoc.exists()) {
-                throw "Document does not exist!";
-            }
-            
-            const newQuantity = (productDoc.data().quantity || 0) + quantity;
-            transaction.update(productRef, { quantity: newQuantity });
+            for (const item of entryData.items) {
+                const productRef = doc(db, "products", item.id);
+                const productDoc = await transaction.get(productRef);
 
-            const movementData: Omit<Movement, 'id'> = {
-                productId: productId,
-                date: new Date().toISOString(),
-                type: 'Entrada',
-                quantity: quantity,
-                responsible: 'Sistema'
-            };
-            const movementRef = doc(collection(db, "movements"));
-            transaction.set(movementRef, movementData);
+                if (!productDoc.exists()) {
+                    throw new Error(`Product with ID ${item.id} does not exist!`);
+                }
+
+                // Increment product quantity
+                transaction.update(productRef, { quantity: increment(item.quantity) });
+
+                // Create movement record
+                const movementData: Omit<Movement, 'id'> = {
+                    productId: item.id,
+                    date: entryData.date,
+                    type: 'Entrada',
+                    quantity: item.quantity,
+                    responsible: entryData.responsible,
+                    supplier: entryData.supplier,
+                    invoice: entryData.invoice,
+                };
+                const movementRef = doc(collection(db, "movements"));
+                transaction.set(movementRef, movementData);
+            }
         });
+        console.log("Transaction successfully committed!");
     } catch (e) {
         console.error("Transaction failed: ", e);
+        throw e; // Re-throw the error to be caught by the calling function
     }
-}
+};
 
 
 export const deleteProduct = async (productId: string): Promise<void> => {
+    // Also delete associated movements in a transaction? For now, just delete the product.
     const productDoc = doc(db, 'products', productId);
     await deleteDoc(productDoc);
 };
 
 // Movement Functions
-const movementsCollection = collection(db, 'movements');
 
 export const getMovements = async (): Promise<Movement[]> => {
     const snapshot = await getDocs(movementsCollection);
@@ -89,7 +108,9 @@ export const getMovements = async (): Promise<Movement[]> => {
 export const getMovementsForItem = async (productId: string): Promise<Movement[]> => {
     const q = query(movementsCollection, where('productId', '==', productId));
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Movement));
+    const movements = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Movement));
+    // Sort by date descending
+    return movements.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 }
 
 export const addMovement = async (movementData: Omit<Movement, 'id'>): Promise<string> => {
