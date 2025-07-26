@@ -43,12 +43,12 @@ import { AddItemSheet } from "./components/add-item-sheet";
 import { EditItemSheet } from "./components/edit-item-sheet";
 import { MovementsSheet } from "./components/movements-sheet";
 import { useToast } from "@/hooks/use-toast";
-import { Product, getProducts, addProduct, updateProduct, deleteProduct, addMovement } from "@/lib/firestore";
-import { movements as allMovements } from "@/lib/mock-data";
+import { products as initialProducts, movements as allMovements, addMovement } from "@/lib/mock-data";
 
+type Product = typeof initialProducts[0];
 
 export default function InventoryPage() {
-  const [products, setProducts] = React.useState<Product[]>([]);
+  const [products, setProducts] = React.useState<Product[]>(initialProducts);
   const [searchTerm, setSearchTerm] = React.useState("");
   const [isAddSheetOpen, setIsAddSheetOpen] = React.useState(false);
   const [isEditSheetOpen, setIsEditSheetOpen] = React.useState(false);
@@ -57,28 +57,15 @@ export default function InventoryPage() {
   const [itemToDelete, setItemToDelete] = React.useState<Product | null>(null);
   const { toast } = useToast();
 
-  React.useEffect(() => {
-    const fetchProducts = async () => {
-        const productsFromDb = await getProducts();
-        setProducts(productsFromDb);
-    };
-    fetchProducts();
-  }, []);
-
-
-  const handleAddItem = React.useCallback(async (newItemData: any) => {
+  const handleAddItem = React.useCallback((newItemData: any) => {
     const itemCode = newItemData.itemCode?.trim();
     
-    // In a real app with a backend, this logic would be more robust.
-    // For now, we simulate checking if an item with the same code exists.
+    // Check if an item with the same code already exists
     if (itemCode) {
       const existingProduct = products.find(p => p.code === itemCode);
-      if (existingProduct && existingProduct.id) {
+      if (existingProduct) {
           const updatedQuantity = existingProduct.quantity + newItemData.initialQuantity;
-          await updateProduct(existingProduct.id, { quantity: updatedQuantity });
-          
           setProducts(prevProducts => prevProducts.map(p => p.id === existingProduct.id ? {...p, quantity: updatedQuantity} : p));
-
           toast({
               title: "Estoque Atualizado!",
               description: `A quantidade de ${existingProduct.name} foi atualizada.`,
@@ -87,41 +74,37 @@ export default function InventoryPage() {
       }
     }
     
-    const newItem: Omit<Product, 'id'> = {
-        name: newItemData.name,
-        code: itemCode || `00${products.length + 1}-25`,
-        patrimony: newItemData.materialType === 'permanente' ? newItemData.patrimony : 'N/A',
-        type: newItemData.materialType,
-        quantity: newItemData.initialQuantity,
-        unit: newItemData.unit,
-        category: newItemData.category,
-        image: "https://placehold.co/40x40.png"
+    const newProduct: Product = {
+      id: (products.length + 1).toString(),
+      name: newItemData.name,
+      code: itemCode || `00${products.length + 1}-25`,
+      patrimony: newItemData.materialType === 'permanente' ? newItemData.patrimony : 'N/A',
+      type: newItemData.materialType,
+      quantity: newItemData.initialQuantity,
+      unit: newItemData.unit,
+      category: newItemData.category,
+      image: "https://placehold.co/40x40.png"
     };
 
-    const newProductId = await addProduct(newItem);
-    setProducts(prevProducts => [...prevProducts, { id: newProductId, ...newItem }]);
+    setProducts(prevProducts => [...prevProducts, newProduct]);
 
   }, [products, toast]);
   
-  const handleUpdateItem = async (updatedItemData: any) => {
-    if (!selectedItem || !selectedItem.id) return;
+  const handleUpdateItem = (updatedItemData: any) => {
+    if (!selectedItem) return;
 
-    const updatedProductData = {
-        name: updatedItemData.name,
-        type: updatedItemData.materialType,
-        code: updatedItemData.itemCode,
-        patrimony: updatedItemData.materialType === 'permanente' ? updatedItemData.patrimony : 'N/A',
-        unit: updatedItemData.unit,
-        quantity: updatedItemData.quantity,
-        category: updatedItemData.category,
-        // Image update logic would go here if we were handling uploads
-    };
-
-    await updateProduct(selectedItem.id, updatedProductData);
-    
     setProducts(prevProducts =>
         prevProducts.map(p => 
-            p.id === selectedItem.id ? { ...p, ...updatedProductData } : p
+            p.id === selectedItem.id ? {
+                ...p,
+                name: updatedItemData.name,
+                type: updatedItemData.materialType,
+                code: updatedItemData.itemCode,
+                patrimony: updatedItemData.materialType === 'permanente' ? updatedItemData.patrimony : 'N/A',
+                unit: updatedItemData.unit,
+                quantity: updatedItemData.quantity,
+                category: updatedItemData.category,
+            } : p
         )
     );
      toast({
@@ -130,8 +113,7 @@ export default function InventoryPage() {
     });
   };
   
-  const handleDeleteItem = async (productId: string) => {
-    await deleteProduct(productId);
+  const handleDeleteItem = (productId: string) => {
     setProducts(prevProducts => prevProducts.filter(p => p.id !== productId));
     setItemToDelete(null);
     toast({
@@ -297,7 +279,7 @@ export default function InventoryPage() {
             <AlertDialogFooter>
               <AlertDialogCancel>Cancelar</AlertDialogCancel>
               <AlertDialogAction
-                onClick={() => handleDeleteItem(itemToDelete.id!)}
+                onClick={() => handleDeleteItem(itemToDelete!.id)}
                 className="bg-red-600 hover:bg-red-700"
               >
                 Sim, excluir
@@ -309,3 +291,5 @@ export default function InventoryPage() {
     </>
   );
 }
+
+    

@@ -39,8 +39,9 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { Product, Movement, getProducts, updateProduct, addMovement } from "@/lib/firestore";
+import { products as mockProducts, addMovement as mockAddMovement } from "@/lib/mock-data";
 
+type Product = typeof mockProducts[0];
 
 type ReturnedItem = {
     id: string;
@@ -51,7 +52,7 @@ type ReturnedItem = {
 
 export default function ReturnsPage() {
     const { toast } = useToast();
-    const [allProducts, setAllProducts] = React.useState<Product[]>([]);
+    const [allProducts, setAllProducts] = React.useState<Product[]>(mockProducts);
     const [returnDate, setReturnDate] = React.useState<Date | undefined>(new Date());
     const [returningDepartment, setReturningDepartment] = React.useState("");
     const [returnReason, setReturnReason] = React.useState("");
@@ -62,19 +63,10 @@ export default function ReturnsPage() {
     const [isSearchOpen, setIsSearchOpen] = React.useState(false);
 
     React.useEffect(() => {
-        const fetchProducts = async () => {
-            const productsFromDb = await getProducts();
-            setAllProducts(productsFromDb);
-        };
-        fetchProducts();
-    }, []);
-    
-    React.useEffect(() => {
-        if (searchTerm.trim() && allProducts.length > 0) {
-            const lowerCaseSearchTerm = searchTerm.toLowerCase();
+        if (searchTerm.trim()) {
             const results = allProducts.filter(item =>
-                item.name.toLowerCase().includes(lowerCaseSearchTerm) ||
-                item.code.toLowerCase().includes(lowerCaseSearchTerm)
+                item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                item.code.toLowerCase().includes(searchTerm.toLowerCase())
             );
             setSearchResults(results);
             setIsSearchOpen(true);
@@ -90,18 +82,11 @@ export default function ReturnsPage() {
     };
 
     const handleAddToList = () => {
-        if (!searchTerm) {
-            toast({
-                title: "Item não encontrado",
-                description: "Por favor, busque e selecione um item.",
-                variant: "destructive"
-            });
-            return;
-        };
+        if (!searchTerm) return;
         
-        const item = allProducts.find(p => p.name.toLowerCase() === searchTerm.toLowerCase() || p.code.toLowerCase() === searchTerm.toLowerCase());
+        const item = allProducts.find(p => p.name.toLowerCase() === searchTerm.toLowerCase());
 
-        if (!item || !item.id) {
+        if (!item) {
              toast({
                 title: "Item não encontrado",
                 description: "O item buscado não existe no inventário.",
@@ -135,7 +120,7 @@ export default function ReturnsPage() {
         setReturnedItems(prev => prev.filter(item => item.id !== itemId));
     };
 
-    const handleFinalizeReturn = async () => {
+    const handleFinalizeReturn = () => {
         if (returnedItems.length === 0) {
             toast({
                 title: "Nenhum item adicionado",
@@ -154,24 +139,23 @@ export default function ReturnsPage() {
             return;
         }
 
-        for (const item of returnedItems) {
-            const product = allProducts.find(p => p.id === item.id);
-            if (product && product.id) {
-                 const newQuantity = product.quantity + item.quantity;
-                 await updateProduct(product.id, { quantity: newQuantity });
-            }
-            const movement: Omit<Movement, 'id'> = {
-                productId: item.id,
-                date: new Date().toISOString(),
-                type: 'Devolução',
-                quantity: item.quantity,
-                responsible: 'sdpinho29' // Mock responsible
-            };
-            await addMovement(movement);
-        }
-
-        const updatedProducts = await getProducts();
-        setAllProducts(updatedProducts);
+        setAllProducts(prevProducts => {
+            const newProducts = [...prevProducts];
+            returnedItems.forEach(item => {
+                const productIndex = newProducts.findIndex(p => p.id === item.id);
+                if (productIndex !== -1) {
+                    newProducts[productIndex].quantity += item.quantity;
+                }
+                mockAddMovement({
+                    productId: item.id,
+                    date: new Date().toISOString(),
+                    type: 'Devolução',
+                    quantity: item.quantity,
+                    responsible: 'sdpinho29' // Mock responsible
+                });
+            });
+            return newProducts;
+        });
 
         toast({
             title: "Devolução Registrada!",
@@ -326,3 +310,5 @@ export default function ReturnsPage() {
         </div>
     );
 }
+
+    

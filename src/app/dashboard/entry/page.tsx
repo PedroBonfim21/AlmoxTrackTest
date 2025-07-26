@@ -45,7 +45,10 @@ import { AddItemSheet } from "../inventory/components/add-item-sheet";
 import { AdminAuthDialog } from "./components/admin-auth-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { Product, Movement, getProducts, addProduct, updateProduct, addMovement } from "@/lib/firestore";
+import { products as mockProducts, movements as mockMovements, addMovement as mockAddMovement } from "@/lib/mock-data";
+
+type Product = typeof mockProducts[0];
+type Movement = typeof mockMovements[0];
 
 type ReceivedItem = {
     id: string;
@@ -59,7 +62,7 @@ const currentUserRole = "Operator";
 
 export default function EntryPage() {
     const { toast } = useToast();
-    const [allProducts, setAllProducts] = React.useState<Product[]>([]);
+    const [allProducts, setAllProducts] = React.useState<Product[]>(mockProducts);
     const [entryDate, setEntryDate] = React.useState<Date | undefined>(new Date());
     const [supplier, setSupplier] = React.useState("");
     const [invoice, setInvoice] = React.useState("");
@@ -74,20 +77,10 @@ export default function EntryPage() {
     const [isAuthDialogOpen, setIsAuthDialogOpen] = React.useState(false);
 
     React.useEffect(() => {
-        const fetchProducts = async () => {
-            const productsFromDb = await getProducts();
-            setAllProducts(productsFromDb);
-        };
-        fetchProducts();
-    }, []);
-    
-
-    React.useEffect(() => {
-       if (searchTerm.trim() && allProducts.length > 0) {
-            const lowerCaseSearchTerm = searchTerm.toLowerCase();
+       if (searchTerm.trim()) {
             const results = allProducts.filter(item =>
-                item.name.toLowerCase().includes(lowerCaseSearchTerm) ||
-                item.code.toLowerCase().includes(lowerCaseSearchTerm)
+                item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                item.code.toLowerCase().includes(searchTerm.toLowerCase())
             );
             setSearchResults(results);
             setIsSearchOpen(true);
@@ -105,11 +98,7 @@ export default function EntryPage() {
     const handleSearchOrAddItem = () => {
         if (!searchTerm) return;
         
-        const lowerCaseSearchTerm = searchTerm.toLowerCase();
-        const existingItem = allProducts.find(item => 
-            item.name.toLowerCase() === lowerCaseSearchTerm || 
-            item.code.toLowerCase() === lowerCaseSearchTerm
-        );
+        const existingItem = allProducts.find(item => item.name.toLowerCase() === searchTerm.toLowerCase());
         
         if (existingItem) {
             handleAddToList(existingItem);
@@ -147,8 +136,9 @@ export default function EntryPage() {
         setReceivedItems(prev => prev.filter(item => item.id !== itemId));
     };
 
-    const handleItemAdded = async (newItemData: any) => {
-        const newItem: Omit<Product, 'id'> = {
+    const handleItemAdded = (newItemData: any) => {
+        const newProduct: Product = {
+            id: (allProducts.length + 1).toString(),
             name: newItemData.name,
             code: newItemData.itemCode || `new-${allProducts.length + 1}`,
             unit: newItemData.unit,
@@ -158,18 +148,16 @@ export default function EntryPage() {
             category: newItemData.category,
             image: "https://placehold.co/40x40.png"
         };
-        const newProductId = await addProduct(newItem);
-        const newProductWithId = { id: newProductId, ...newItem };
 
-        setAllProducts(prev => [...prev, newProductWithId]);
+        setAllProducts(prev => [...prev, newProduct]);
         
         toast({
             title: "Item Adicionado!",
-            description: `${newItem.name} foi adicionado ao inventário.`,
+            description: `${newProduct.name} foi adicionado ao inventário.`,
         });
         
         if (newItemData.initialQuantity > 0) {
-            setReceivedItems(prev => [...prev, { id: newProductId, name: newItem.name, quantity: newItemData.initialQuantity, unit: newItem.unit }]);
+            setReceivedItems(prev => [...prev, { id: newProduct.id, name: newProduct.name, quantity: newItemData.initialQuantity, unit: newProduct.unit }]);
         }
     };
 
@@ -178,7 +166,7 @@ export default function EntryPage() {
         setIsAddItemSheetOpen(true);
     };
 
-    const handleFinalizeEntry = async () => {
+    const handleFinalizeEntry = () => {
         if (receivedItems.length === 0) {
             toast({
                 title: "Nenhum item adicionado",
@@ -188,25 +176,25 @@ export default function EntryPage() {
             return;
         }
         
-        for (const item of receivedItems) {
-            const product = allProducts.find(p => p.id === item.id);
-            if (product && product.id) {
-                const newQuantity = product.quantity + item.quantity;
-                await updateProduct(product.id, { quantity: newQuantity });
-            }
+        setAllProducts(prevProducts => {
+            const newProducts = [...prevProducts];
+            receivedItems.forEach(item => {
+                const productIndex = newProducts.findIndex(p => p.id === item.id);
+                if (productIndex !== -1) {
+                    newProducts[productIndex].quantity += item.quantity;
+                }
 
-            const movement: Omit<Movement, 'id'> = {
-                productId: item.id,
-                date: new Date().toISOString(),
-                type: 'Entrada',
-                quantity: item.quantity,
-                responsible: 'sdpinho29' // Mock responsible user
-            };
-            await addMovement(movement);
-        }
-        
-        const updatedProducts = await getProducts();
-        setAllProducts(updatedProducts);
+                // Add to movements (mock)
+                mockAddMovement({
+                    productId: item.id,
+                    date: new Date().toISOString(),
+                    type: 'Entrada',
+                    quantity: item.quantity,
+                    responsible: 'sdpinho29' // Mock responsible user
+                });
+            });
+            return newProducts;
+        });
         
         toast({
             title: "Entrada Registrada!",
@@ -373,3 +361,5 @@ export default function EntryPage() {
     </>
   );
 }
+
+    

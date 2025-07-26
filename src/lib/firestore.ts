@@ -86,3 +86,5 @@ export const seedDatabase = async (products: Omit<Product, 'id'>[], movements: O
     await batch.commit();
     console.log('Database seeded successfully!');
 }
+
+    

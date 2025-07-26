@@ -2,10 +2,10 @@
 "use client";
 
 import * as React from "react";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
-import { Movement, getMovementsForItem } from "@/lib/firestore";
+import { movements as allMovements } from "@/lib/mock-data";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -26,6 +26,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+
+type Movement = typeof allMovements[0];
 
 const getBadgeVariant = (type: string) => {
     switch (type) {
@@ -50,12 +52,9 @@ export function MovementsSheet({ isOpen, onOpenChange, item }: MovementsSheetPro
   const [itemMovements, setItemMovements] = React.useState<Movement[]>([]);
 
   React.useEffect(() => {
-    if (isOpen && item && item.id) {
-      const fetchMovements = async () => {
-        const movements = await getMovementsForItem(item.id);
-        setItemMovements(movements);
-      };
-      fetchMovements();
+    if (isOpen && item) {
+      const movements = allMovements.filter(m => m.productId === item.id);
+      setItemMovements(movements);
     }
   }, [isOpen, item]);
 
@@ -83,7 +82,7 @@ export function MovementsSheet({ isOpen, onOpenChange, item }: MovementsSheetPro
                   {itemMovements.length > 0 ? (
                     itemMovements.map((movement) => (
                       <TableRow key={movement.id}>
-                        <TableCell>{format(new Date(movement.date), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</TableCell>
+                        <TableCell>{format(parseISO(movement.date), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</TableCell>
                         <TableCell>
                           <Badge variant="outline" className={cn('font-normal', getBadgeVariant(movement.type))}>
                               {movement.type}
@@ -113,3 +112,5 @@ export function MovementsSheet({ isOpen, onOpenChange, item }: MovementsSheetPro
     </Sheet>
   );
 }
+
+    

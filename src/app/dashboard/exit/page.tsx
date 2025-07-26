@@ -46,7 +46,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { Product, Movement, getProducts, updateProduct, addMovement } from "@/lib/firestore";
+import { products as mockProducts, addMovement as mockAddMovement } from "@/lib/mock-data";
+
+type Product = typeof mockProducts[0];
 
 type RequestedItem = {
     id: string;
@@ -58,7 +60,7 @@ type RequestedItem = {
 
 export default function ExitPage() {
     const { toast } = useToast();
-    const [allProducts, setAllProducts] = React.useState<Product[]>([]);
+    const [allProducts, setAllProducts] = React.useState<Product[]>(mockProducts);
     const [activeTab, setActiveTab] = React.useState("consumption");
 
     // State for Consumption Tab
@@ -86,14 +88,6 @@ export default function ExitPage() {
     const [responsibilityItems, setResponsibilityItems] = React.useState<RequestedItem[]>([]);
     const [isConfirmDialogOpen, setIsConfirmDialogOpen] = React.useState(false);
     const [isTermAccepted, setIsTermAccepted] = React.useState(false);
-    
-    React.useEffect(() => {
-        const fetchProducts = async () => {
-            const productsFromDb = await getProducts();
-            setAllProducts(productsFromDb);
-        };
-        fetchProducts();
-    }, []);
 
     const consumableItems = allProducts.filter(p => p.type === 'consumo');
     const permanentItems = allProducts.filter(p => p.type === 'permanente');
@@ -153,7 +147,7 @@ export default function ExitPage() {
             i.code.toLowerCase() === searchTerm.toLowerCase()
         );
 
-        if (!item || !item.id) {
+        if (!item) {
             toast({ title: "Item não encontrado", description: `O item buscado não existe no estoque de ${type === 'consumption' ? 'consumo' : 'permanente'}.`, variant: "destructive" });
             return;
         }
@@ -196,7 +190,7 @@ export default function ExitPage() {
         setRequestedItemsFn(prev => prev.filter(item => item.id !== itemId));
     };
 
-    const handleFinalizeIssue = async () => {
+    const handleFinalizeIssue = () => {
         if (requestedItems.length === 0) {
             toast({ title: "Nenhum item solicitado", description: "Adicione pelo menos um item para registrar a saída.", variant: "destructive" });
             return;
@@ -207,25 +201,24 @@ export default function ExitPage() {
             return;
         }
         
-        for (const item of requestedItems) {
-            const product = allProducts.find(p => p.id === item.id);
-            if (product && product.id) {
-                const newQuantity = product.quantity - item.quantity;
-                await updateProduct(product.id, { quantity: newQuantity });
-            }
-            const movement: Omit<Movement, 'id'> = {
-                productId: item.id,
-                date: new Date().toISOString(),
-                type: 'Saída',
-                quantity: item.quantity,
-                responsible: requesterName,
-                department: department,
-            };
-            await addMovement(movement);
-        }
-        
-        const updatedProducts = await getProducts();
-        setAllProducts(updatedProducts);
+        setAllProducts(prevProducts => {
+            const newProducts = [...prevProducts];
+            requestedItems.forEach(item => {
+                const productIndex = newProducts.findIndex(p => p.id === item.id);
+                if (productIndex !== -1) {
+                    newProducts[productIndex].quantity -= item.quantity;
+                }
+                mockAddMovement({
+                    productId: item.id,
+                    date: new Date().toISOString(),
+                    type: 'Saída',
+                    quantity: item.quantity,
+                    responsible: requesterName,
+                    department: department,
+                });
+            });
+            return newProducts;
+        });
         
         toast({ title: "Saída Registrada!", description: "A saída de materiais de consumo foi registrada com sucesso." });
 
@@ -251,34 +244,34 @@ export default function ExitPage() {
         setIsConfirmDialogOpen(true);
     };
 
-    const handlePrintAndFinalize = async (e: React.MouseEvent<HTMLButtonElement>) => {
+    const handlePrintAndFinalize = (e: React.MouseEvent<HTMLButtonElement>) => {
         e.preventDefault();
         
-        for (const item of responsibilityItems) {
-             const product = allProducts.find(p => p.id === item.id);
-            if (product && product.id) {
-                const newQuantity = product.quantity - item.quantity;
-                await updateProduct(product.id, { quantity: newQuantity });
-            }
-            const movement: Omit<Movement, 'id'> = {
-                productId: item.id,
-                date: new Date().toISOString(),
-                type: 'Saída',
-                quantity: item.quantity,
-                responsible: responsibleName,
-                department: responsibilityDepartment
-            };
-            await addMovement(movement);
-        }
+        setAllProducts(prevProducts => {
+            const newProducts = [...prevProducts];
+            responsibilityItems.forEach(item => {
+                const productIndex = newProducts.findIndex(p => p.id === item.id);
+                if (productIndex !== -1) {
+                    newProducts[productIndex].quantity -= item.quantity;
+                }
+                mockAddMovement({
+                    productId: item.id,
+                    date: new Date().toISOString(),
+                    type: 'Saída',
+                    quantity: item.quantity,
+                    responsible: responsibleName,
+                    department: responsibilityDepartment
+                });
+            });
+            return newProducts;
+        });
 
         toast({ title: "Termo Gerado e Saída Registrada!", description: "A saída de material permanente foi registrada com sucesso." });
         
-        setTimeout(async () => {
+        setTimeout(() => {
             window.print();
             
             // Reset form after printing
-            const updatedProducts = await getProducts();
-            setAllProducts(updatedProducts);
             setIsConfirmDialogOpen(false);
             setResponsibilityDate(new Date());
             setResponsibleName("");
@@ -581,9 +574,10 @@ export default function ExitPage() {
                                     </TableHeader>
                                     <TableBody>
                                         {responsibilityItems.map(reqItem => {
+                                            const product = permanentItems.find(p => p.id === reqItem.id);
                                             return (
                                                 <TableRow key={reqItem.id}>
-                                                    <TableCell>{reqItem.patrimony || 'N/A'}</TableCell>
+                                                    <TableCell>{product?.patrimony || 'N/A'}</TableCell>
                                                     <TableCell>{reqItem.name}</TableCell>
                                                     <TableCell>N/A</TableCell>
                                                 </TableRow>
@@ -653,3 +647,5 @@ export default function ExitPage() {
         </div>
     );
 }
+
+    
