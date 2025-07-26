@@ -64,7 +64,7 @@ const currentUserRole = "Operator";
 
 export default function EntryPage() {
     const { toast } = useToast();
-    const [entryDate, setEntryDate] = React.useState<Date | undefined>(new Date());
+    const [entryDate, setEntryDate] = React.useState<Date | undefined>(undefined);
     const [supplier, setSupplier] = React.useState("");
     const [invoice, setInvoice] = React.useState("");
     
@@ -76,6 +76,10 @@ export default function EntryPage() {
     const [isAddItemSheetOpen, setIsAddItemSheetOpen] = React.useState(false);
     const [isAuthDialogOpen, setIsAuthDialogOpen] = React.useState(false);
     
+    React.useEffect(() => {
+        setEntryDate(new Date());
+    }, []);
+
     React.useEffect(() => {
         const lowerCaseSearchTerm = searchTerm.toLowerCase();
         const results = mockInventoryItems.filter(item =>
