@@ -41,6 +41,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { AddItemSheet } from "./components/add-item-sheet";
 import { EditItemSheet } from "./components/edit-item-sheet";
+import { MovementsSheet } from "./components/movements-sheet";
 import { useToast } from "@/hooks/use-toast";
 
 const initialProducts = [
@@ -51,7 +52,7 @@ const initialProducts = [
     code: "001-25",
     patrimony: "N/A",
     type: "consumo",
-    quantity: 82,
+    quantity: 92,
     unit: "und",
     category: "Escritório",
   },
@@ -108,6 +109,7 @@ export default function InventoryPage() {
   const [searchTerm, setSearchTerm] = React.useState("");
   const [isAddSheetOpen, setIsAddSheetOpen] = React.useState(false);
   const [isEditSheetOpen, setIsEditSheetOpen] = React.useState(false);
+  const [isMovementsSheetOpen, setIsMovementsSheetOpen] = React.useState(false);
   const [selectedItem, setSelectedItem] = React.useState<any>(null);
   const [itemToDelete, setItemToDelete] = React.useState<any>(null);
   const { toast } = useToast();
@@ -116,27 +118,28 @@ export default function InventoryPage() {
   const handleAddItem = React.useCallback((newItemData: any) => {
     const itemCode = newItemData.itemCode?.trim();
 
-    const existingProductIndex = products.findIndex(p => p.code === itemCode);
-
-    if (itemCode && existingProductIndex > -1) {
-        setProducts(prevProducts => {
-            const newProducts = [...prevProducts];
-            const existingProduct = newProducts[existingProductIndex];
-            
-            existingProduct.quantity += newItemData.initialQuantity;
-            
-            if (newItemData.image instanceof File) {
-                existingProduct.imagePreview = URL.createObjectURL(newItemData.image);
-            }
-            
-            toast({
-                title: "Estoque Atualizado!",
-                description: `A quantidade de ${existingProduct.name} foi atualizada.`,
-            });
-            
-            return newProducts;
-        });
-        return;
+    if (itemCode) {
+      const existingProductIndex = products.findIndex(p => p.code === itemCode);
+      if (existingProductIndex > -1) {
+          setProducts(prevProducts => {
+              const newProducts = [...prevProducts];
+              const existingProduct = newProducts[existingProductIndex];
+              
+              existingProduct.quantity += newItemData.initialQuantity;
+              
+              if (newItemData.image instanceof File) {
+                  existingProduct.imagePreview = URL.createObjectURL(newItemData.image);
+              }
+              
+              toast({
+                  title: "Estoque Atualizado!",
+                  description: `A quantidade de ${existingProduct.name} foi atualizada.`,
+              });
+              
+              return newProducts;
+          });
+          return;
+      }
     }
     
     const newItem: Product = {
@@ -193,6 +196,11 @@ export default function InventoryPage() {
     setIsEditSheetOpen(true);
   };
 
+  const handleMovementsClick = (product: any) => {
+    setSelectedItem(product);
+    setIsMovementsSheetOpen(true);
+  };
+
   const filteredProducts = products.filter(
     (product) =>
       product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -206,7 +214,7 @@ export default function InventoryPage() {
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Inventário</h1>
             <p className="text-muted-foreground">
-              Consulte e gira todos os itens em stock.
+              Consulte e gerencie todos os itens em estoque.
             </p>
           </div>
           <Button onClick={() => setIsAddSheetOpen(true)}>
@@ -278,7 +286,7 @@ export default function InventoryPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleMovementsClick(product)}>
                               <History className="mr-2 h-4 w-4" />
                               <span>Ver Movimentações</span>
                             </DropdownMenuItem>
@@ -312,6 +320,13 @@ export default function InventoryPage() {
           isOpen={isEditSheetOpen}
           onOpenChange={setIsEditSheetOpen}
           onItemUpdated={handleUpdateItem}
+          item={selectedItem}
+        />
+      )}
+      {selectedItem && (
+        <MovementsSheet
+          isOpen={isMovementsSheetOpen}
+          onOpenChange={setIsMovementsSheetOpen}
           item={selectedItem}
         />
       )}
