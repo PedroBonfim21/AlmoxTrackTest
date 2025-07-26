@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from "next/link";
@@ -44,6 +45,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { AdminSyncAuthDialog } from "./components/admin-sync-auth-dialog";
 import { usePathname } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
+import { products } from "@/lib/mock-data";
+import { syncToSheet } from "@/ai/flows/sync-sheet-flow";
 
 // Mock user role - 'Admin' or 'Operator'
 const currentUserRole = "Admin";
@@ -65,12 +68,35 @@ export default function DashboardLayout({
     { href: "/dashboard/returns", icon: ChevronsLeftRight, label: "Devolução" },
   ];
 
-  const handleSyncSuccess = () => {
+  const handleSyncSuccess = async (credential: any) => {
     toast({
-      title: "Autenticação bem-sucedida!",
-      description: "A funcionalidade de sincronização de planilhas já pode ser acessada.",
+      title: "Authentication Successful!",
+      description: "Now syncing data to Google Sheets. This may take a moment...",
     });
-    // Here you would typically navigate to the sync page or open the feature
+
+    try {
+        const result = await syncToSheet({
+            accessToken: credential.accessToken,
+            products,
+        });
+        toast({
+            title: "Sync Complete!",
+            description: (
+                <p>
+                    Data synced to a new spreadsheet.
+                    <a href={result.spreadsheetUrl} target="_blank" rel="noopener noreferrer" className="underline ml-1">
+                        Open Sheet
+                    </a>
+                </p>
+            ),
+        });
+    } catch (error: any) {
+        toast({
+            title: "Sync Failed",
+            description: error.message || "An unknown error occurred.",
+            variant: "destructive",
+        });
+    }
   };
 
   return (
