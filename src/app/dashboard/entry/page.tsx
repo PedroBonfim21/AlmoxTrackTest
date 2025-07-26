@@ -34,7 +34,7 @@ import { AdminAuthDialog } from "./components/admin-auth-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import type { Product } from "@/lib/firestore";
-import { getProducts, addProduct, finalizeEntry } from "@/lib/firestore";
+import { getProducts, addProduct, finalizeEntry, uploadImage } from "@/lib/firestore";
 
 type ReceivedItem = {
     id: string;
@@ -66,10 +66,19 @@ export default function EntryPage() {
 
     const fetchProducts = React.useCallback(async () => {
         setIsLoading(true);
-        const productsFromDb = await getProducts();
-        setAllProducts(productsFromDb);
-        setIsLoading(false);
-    }, []);
+        try {
+            const productsFromDb = await getProducts();
+            setAllProducts(productsFromDb);
+        } catch (error) {
+            toast({
+                title: "Erro ao Carregar Produtos",
+                description: "Não foi possível buscar os produtos do banco de dados.",
+                variant: "destructive",
+            });
+        } finally {
+            setIsLoading(false);
+        }
+    }, [toast]);
 
     React.useEffect(() => {
         fetchProducts();
@@ -137,37 +146,50 @@ export default function EntryPage() {
 
     const handleItemAdded = async (newItemData: any) => {
         setIsLoading(true);
-        const newProductData: Omit<Product, 'id'> = {
-            name: newItemData.name,
-            code: newItemData.itemCode || `new-${Date.now()}`,
-            unit: newItemData.unit,
-            patrimony: newItemData.materialType === 'permanente' ? newItemData.patrimony : 'N/A',
-            type: newItemData.materialType,
-            quantity: 0, // Initial quantity is 0, will be updated by the entry
-            category: newItemData.category,
-            image: "https://placehold.co/40x40.png"
-        };
-        
-        const newProductId = await addProduct(newProductData);
-        const newProductWithId = { ...newProductData, id: newProductId };
-        
-        setAllProducts(prev => [...prev, newProductWithId]);
-        
-        toast({
-            title: "Item Adicionado!",
-            description: `${newProductData.name} foi adicionado ao inventário.`,
-        });
-        
-        // Add the new item with its initial quantity to the received items list
-        if (newItemData.initialQuantity > 0) {
-            setReceivedItems(prev => [...prev, {
-                id: newProductWithId.id,
-                name: newProductWithId.name,
-                quantity: newItemData.initialQuantity,
-                unit: newProductWithId.unit
-            }]);
+        try {
+            let imageUrl = "https://placehold.co/40x40.png";
+            if (newItemData.image) {
+                imageUrl = await uploadImage(newItemData.image);
+            }
+
+            const newProductData: Omit<Product, 'id'> = {
+                name: newItemData.name,
+                code: newItemData.itemCode || `new-${Date.now()}`,
+                unit: newItemData.unit,
+                patrimony: newItemData.materialType === 'permanente' ? newItemData.patrimony : 'N/A',
+                type: newItemData.materialType,
+                quantity: 0, // Initial quantity is 0, entry will update it
+                category: newItemData.category,
+                image: imageUrl,
+            };
+            
+            const newProductId = await addProduct(newProductData);
+            const newProductWithId = { ...newProductData, id: newProductId };
+            
+            setAllProducts(prev => [...prev, newProductWithId]);
+            
+            toast({
+                title: "Item Adicionado!",
+                description: `${newProductData.name} foi adicionado ao inventário.`,
+            });
+            
+            if (newItemData.initialQuantity > 0) {
+                setReceivedItems(prev => [...prev, {
+                    id: newProductWithId.id,
+                    name: newProductWithId.name,
+                    quantity: newItemData.initialQuantity,
+                    unit: newProductWithId.unit
+                }]);
+            }
+        } catch (error) {
+             toast({
+                title: "Erro ao Adicionar Item",
+                description: "Não foi possível adicionar o novo item.",
+                variant: "destructive",
+            });
+        } finally {
+            setIsLoading(false);
         }
-        setIsLoading(false);
     };
 
     const handleAuthSuccess = () => {

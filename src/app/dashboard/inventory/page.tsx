@@ -59,10 +59,19 @@ export default function InventoryPage() {
 
   const fetchProducts = React.useCallback(async () => {
     setIsLoading(true);
-    const productsFromDb = await getProducts();
-    setProducts(productsFromDb);
-    setIsLoading(false);
-  }, []);
+    try {
+      const productsFromDb = await getProducts();
+      setProducts(productsFromDb);
+    } catch (error) {
+       toast({
+        title: "Erro ao Carregar Produtos",
+        description: "Não foi possível buscar os produtos do banco de dados.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [toast]);
 
   React.useEffect(() => {
     fetchProducts();
@@ -105,6 +114,7 @@ export default function InventoryPage() {
             title: "Item Adicionado!",
             description: `${newProduct.name} foi adicionado ao inventário.`,
         });
+        fetchProducts(); // Refresh the product list
     } catch(error) {
         toast({
             title: "Erro ao Adicionar Item",
@@ -112,7 +122,6 @@ export default function InventoryPage() {
             variant: "destructive"
         });
     } finally {
-        fetchProducts();
         setIsLoading(false);
     }
   }, [fetchProducts, toast]);
@@ -143,6 +152,7 @@ export default function InventoryPage() {
           title: "Item Atualizado!",
           description: `${updatedItemData.name} foi atualizado com sucesso.`,
         });
+        fetchProducts(); // Refresh the product list
     } catch(error) {
          toast({
             title: "Erro ao Atualizar Item",
@@ -150,19 +160,29 @@ export default function InventoryPage() {
             variant: "destructive"
         });
     } finally {
-        fetchProducts();
         setIsLoading(false);
     }
   };
   
   const handleDeleteItem = async (productId: string) => {
-    await deleteProduct(productId);
-    setItemToDelete(null);
-    toast({
-        title: "Item Excluído!",
-        description: "O item foi removido do inventário.",
-    });
-    fetchProducts();
+    setIsLoading(true);
+    try {
+        await deleteProduct(productId);
+        toast({
+            title: "Item Excluído!",
+            description: "O item foi removido do inventário.",
+        });
+        fetchProducts(); // Refresh the product list
+    } catch(error) {
+        toast({
+            title: "Erro ao Excluir Item",
+            description: "Não foi possível excluir o item. Tente novamente.",
+            variant: "destructive"
+        });
+    } finally {
+        setItemToDelete(null);
+        setIsLoading(false);
+    }
   };
 
 

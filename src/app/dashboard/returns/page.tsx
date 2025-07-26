@@ -65,10 +65,19 @@ export default function ReturnsPage() {
 
     const fetchProducts = React.useCallback(async () => {
         setIsLoading(true);
-        const productsFromDb = await getProducts();
-        setAllProducts(productsFromDb);
-        setIsLoading(false);
-    }, []);
+        try {
+            const productsFromDb = await getProducts();
+            setAllProducts(productsFromDb);
+        } catch (error) {
+             toast({
+                title: "Erro ao Carregar Produtos",
+                description: "Não foi possível buscar os produtos do banco de dados.",
+                variant: "destructive",
+            });
+        } finally {
+            setIsLoading(false);
+        }
+    }, [toast]);
 
     React.useEffect(() => {
         fetchProducts();

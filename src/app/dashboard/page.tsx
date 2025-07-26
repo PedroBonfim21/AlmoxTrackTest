@@ -51,6 +51,7 @@ import {
 import type { Product, Movement } from "@/lib/firestore";
 import { getProducts, getMovements } from "@/lib/firestore";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
 
 
 export default function DashboardPage() {
@@ -66,18 +67,29 @@ export default function DashboardPage() {
   const [materialType, setMaterialType] = React.useState("all");
   const [department, setDepartment] = React.useState("all");
   const [isLoading, setIsLoading] = React.useState(true);
+  const { toast } = useToast();
 
-  React.useEffect(() => {
-    const fetchData = async () => {
+  const fetchData = React.useCallback(async () => {
         setIsLoading(true);
-        const [productsData, movementsData] = await Promise.all([getProducts(), getMovements()]);
-        setProducts(productsData);
-        setAllMovements(movementsData);
-        setFilteredMovements(movementsData);
-        setIsLoading(false);
-    };
-    fetchData();
-  }, []);
+        try {
+            const [productsData, movementsData] = await Promise.all([getProducts(), getMovements()]);
+            setProducts(productsData);
+            setAllMovements(movementsData);
+        } catch (error) {
+            toast({
+                title: "Erro ao Carregar Dados",
+                description: "Não foi possível buscar os dados do dashboard.",
+                variant: "destructive",
+            });
+        } finally {
+            setIsLoading(false);
+        }
+    }, [toast]);
+
+    React.useEffect(() => {
+        fetchData();
+    }, [fetchData]);
+
   
   const handleApplyFilters = React.useCallback(() => {
     let newFilteredMovements = allMovements;
@@ -125,8 +137,10 @@ export default function DashboardPage() {
 
   // Run on mount and when filters change
   React.useEffect(() => {
-    handleApplyFilters();
-  }, [handleApplyFilters]);
+    if (!isLoading) {
+        handleApplyFilters();
+    }
+  }, [isLoading, handleApplyFilters]);
 
   const uniqueDepartments = React.useMemo(() => 
     [...new Set(allMovements.map((m) => m.department).filter(Boolean as any))]
