@@ -39,7 +39,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import type { Product } from "@/lib/firestore";
-import { getProducts, updateProduct, addMovement } from "@/lib/firestore";
+import { getProducts, finalizeReturn } from "@/lib/firestore";
 
 
 type ReturnedItem = {
@@ -61,6 +61,7 @@ export default function ReturnsPage() {
     const [searchResults, setSearchResults] = React.useState<Product[]>([]);
     const [isSearchOpen, setIsSearchOpen] = React.useState(false);
     const [isLoading, setIsLoading] = React.useState(true);
+    const [isFinalizing, setIsFinalizing] = React.useState(false);
 
     const fetchProducts = React.useCallback(async () => {
         setIsLoading(true);
@@ -150,23 +151,17 @@ export default function ReturnsPage() {
             return;
         }
 
+        setIsFinalizing(true);
         try {
-            for (const item of returnedItems) {
-                const product = allProducts.find(p => p.id === item.id);
-                if (product) {
-                    const newQuantity = product.quantity + item.quantity;
-                    await updateProduct(item.id, { quantity: newQuantity });
-                    await addMovement({
-                        productId: item.id,
-                        date: new Date().toISOString(),
-                        type: 'Devolução',
-                        quantity: item.quantity,
-                        responsible: 'sdpinho29' // Mock responsible
-                    });
-                }
-            }
+            await finalizeReturn({
+                items: returnedItems,
+                date: returnDate?.toISOString() || new Date().toISOString(),
+                department: returningDepartment,
+                reason: returnReason,
+                responsible: 'sdpinho29' // Mock responsible
+            });
 
-            fetchProducts();
+            await fetchProducts();
 
             toast({
                 title: "Devolução Registrada!",
@@ -184,6 +179,8 @@ export default function ReturnsPage() {
                 description: "Não foi possível registrar a devolução. Tente novamente.",
                 variant: "destructive"
             });
+        } finally {
+            setIsFinalizing(false);
         }
     };
 
@@ -326,9 +323,9 @@ export default function ReturnsPage() {
                             size="lg" 
                             variant="accent" 
                             onClick={handleFinalizeReturn} 
-                            disabled={returnedItems.length === 0}
+                            disabled={isFinalizing || returnedItems.length === 0}
                         >
-                            Finalizar Devolução
+                             {isFinalizing ? "Finalizando..." : "Finalizar Devolução"}
                         </Button>
                     </div>
                 </CardContent>

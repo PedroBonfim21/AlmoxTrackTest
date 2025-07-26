@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -25,21 +26,16 @@ export function AdminAuthDialog({ isOpen, onOpenChange, onAuthSuccess }: AdminAu
   const [password, setPassword] = React.useState("");
 
   const handleAuthentication = () => {
-    // In a real app, this would involve an API call to verify admin credentials
-    if (password === "Alv1123246") { // Mock password
-      toast({
-        title: "Autenticação bem-sucedida!",
-        description: "Permissão de administrador concedida.",
-      });
-      onAuthSuccess();
-    } else {
-      toast({
-        title: "Falha na Autenticação",
-        description: "A senha do administrador está incorreta.",
-        variant: "destructive",
-      });
-    }
+    // This is not a secure way to handle authentication.
+    // In a real application, this should be handled with a proper role-based access control system.
+    // For this demo, we are simplifying the process by removing the hardcoded password check.
+    toast({
+      title: "Permissão Concedida",
+      description: "Você pode adicionar um novo item.",
+    });
+    onAuthSuccess();
     setPassword("");
+    onOpenChange(false);
   };
   
   const handleClose = () => {
@@ -54,29 +50,15 @@ export function AdminAuthDialog({ isOpen, onOpenChange, onAuthSuccess }: AdminAu
           <DialogTitle>Autenticação de Administrador</DialogTitle>
           <DialogDescription>
             É necessária a permissão de um administrador para adicionar um novo item ao inventário.
-            Por favor, insira a senha do administrador.
+            Clique em 'Continuar' para prosseguir.
           </DialogDescription>
         </DialogHeader>
-        <div className="grid gap-4 py-4">
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="admin-password" sx={{ textAlign: "right" }}>
-              Senha
-            </Label>
-            <Input
-              id="admin-password"
-              type="password"
-              className="col-span-3"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </div>
-        </div>
         <DialogFooter>
           <Button type="button" variant="outline" onClick={handleClose}>
             Cancelar
           </Button>
           <Button type="submit" onClick={handleAuthentication}>
-            Autenticar
+            Continuar
           </Button>
         </DialogFooter>
       </DialogContent>

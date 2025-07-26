@@ -44,7 +44,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import type { Product } from "@/lib/firestore";
-import { getProducts, updateProduct, addMovement } from "@/lib/firestore";
+import { getProducts, finalizeExit } from "@/lib/firestore";
 
 type RequestedItem = {
     id: string;
@@ -85,16 +85,18 @@ export default function ExitPage() {
     const [isConfirmDialogOpen, setIsConfirmDialogOpen] = React.useState(false);
     const [isTermAccepted, setIsTermAccepted] = React.useState(false);
     const [isLoading, setIsLoading] = React.useState(true);
+    const [isFinalizing, setIsFinalizing] = React.useState(false);
     
-    React.useEffect(() => {
-        const fetchProducts = async () => {
-            setIsLoading(true);
-            const productsFromDb = await getProducts();
-            setAllProducts(productsFromDb);
-            setIsLoading(false);
-        };
-        fetchProducts();
+    const fetchProducts = React.useCallback(async () => {
+        setIsLoading(true);
+        const productsFromDb = await getProducts();
+        setAllProducts(productsFromDb);
+        setIsLoading(false);
     }, []);
+
+    React.useEffect(() => {
+        fetchProducts();
+    }, [fetchProducts]);
 
     const consumableItems = allProducts.filter(p => p.type === 'consumo');
     const permanentItems = allProducts.filter(p => p.type === 'permanente');
@@ -196,37 +198,6 @@ export default function ExitPage() {
         const setRequestedItemsFn = type === 'consumption' ? setRequestedItems : setResponsibilityItems;
         setRequestedItemsFn(prev => prev.filter(item => item.id !== itemId));
     };
-    
-    const finalizeItems = async (itemsToProcess: {id: string, quantity: number}[], responsible: string, dept: string) => {
-        try {
-            for (const item of itemsToProcess) {
-                const product = allProducts.find(p => p.id === item.id);
-                if (product) {
-                    const newQuantity = product.quantity - item.quantity;
-                    await updateProduct(item.id, { quantity: newQuantity });
-                    await addMovement({
-                        productId: item.id,
-                        date: new Date().toISOString(),
-                        type: 'Saída',
-                        quantity: item.quantity,
-                        responsible: responsible,
-                        department: dept
-                    });
-                }
-            }
-             // Refetch products to get updated quantities
-            const updatedProducts = await getProducts();
-            setAllProducts(updatedProducts);
-            return true;
-        } catch (error) {
-             toast({
-                title: "Erro ao Finalizar Saída",
-                description: "Não foi possível registrar a saída. Tente novamente.",
-                variant: "destructive"
-            });
-            return false;
-        }
-    }
 
     const handleFinalizeIssue = async () => {
         if (requestedItems.length === 0) {
@@ -239,10 +210,20 @@ export default function ExitPage() {
             return;
         }
         
-        const success = await finalizeItems(requestedItems, requesterName, department);
+        setIsFinalizing(true);
+        try {
+            await finalizeExit({
+                items: requestedItems,
+                date: requestDate?.toISOString() || new Date().toISOString(),
+                requester: `${requesterName} (${requesterId})`,
+                department: department,
+                purpose: purpose,
+            });
 
-        if (success) {
+            await fetchProducts();
+            
             toast({ title: "Saída Registrada!", description: "A saída de materiais de consumo foi registrada com sucesso." });
+            
             // Reset form
             setRequestDate(new Date());
             setRequesterName("");
@@ -250,6 +231,14 @@ export default function ExitPage() {
             setDepartment("");
             setPurpose("");
             setRequestedItems([]);
+        } catch (error: any) {
+             toast({
+                title: "Erro ao Finalizar Saída",
+                description: error.message || "Não foi possível registrar a saída. Tente novamente.",
+                variant: "destructive"
+            });
+        } finally {
+            setIsFinalizing(false);
         }
     };
     
@@ -269,9 +258,18 @@ export default function ExitPage() {
     const handlePrintAndFinalize = async (e: React.MouseEvent<HTMLButtonElement>) => {
         e.preventDefault();
         
-        const success = await finalizeItems(responsibilityItems, responsibleName, responsibilityDepartment);
-        
-        if (success) {
+        setIsFinalizing(true);
+        try {
+            await finalizeExit({
+                items: responsibilityItems,
+                date: responsibilityDate?.toISOString() || new Date().toISOString(),
+                requester: `${responsibleName} (${responsibleId})`,
+                department: responsibilityDepartment,
+                purpose: projectDescription,
+            });
+
+            await fetchProducts();
+
             toast({ title: "Termo Gerado e Saída Registrada!", description: "A saída de material permanente foi registrada com sucesso." });
             
             setTimeout(() => {
@@ -286,6 +284,15 @@ export default function ExitPage() {
                 setProjectDescription("");
                 setResponsibilityItems([]);
             }, 100);
+
+        } catch (error: any) {
+            toast({
+                title: "Erro ao Finalizar Saída",
+                description: error.message || "Não foi possível registrar a saída. Tente novamente.",
+                variant: "destructive"
+            });
+        } finally {
+            setIsFinalizing(false);
         }
     };
 
@@ -428,8 +435,8 @@ export default function ExitPage() {
                                 </Card>
                             </div>
                             <div className="flex justify-end mt-6">
-                                <Button size="lg" onClick={handleFinalizeIssue} disabled={requestedItems.length === 0}>
-                                    Finalizar Saída
+                                <Button size="lg" onClick={handleFinalizeIssue} disabled={isFinalizing || requestedItems.length === 0}>
+                                    {isFinalizing ? "Finalizando..." : "Finalizar Saída"}
                                 </Button>
                             </div>
                         </CardContent>
@@ -557,8 +564,8 @@ export default function ExitPage() {
                                 </Card>
                             </div>
                             <div className="flex justify-end mt-6">
-                                <Button size="lg" onClick={handleFinalizeResponsibility} disabled={responsibilityItems.length === 0}>
-                                    Gerar Termo e Finalizar
+                                <Button size="lg" onClick={handleFinalizeResponsibility} disabled={isFinalizing || responsibilityItems.length === 0}>
+                                    {isFinalizing ? "Finalizando..." : "Gerar Termo e Finalizar"}
                                 </Button>
                             </div>
                         </CardContent>

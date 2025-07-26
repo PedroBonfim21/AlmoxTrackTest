@@ -36,6 +36,22 @@ type EntryData = {
     responsible: string;
 }
 
+type ExitData = {
+    items: { id: string; quantity: number }[];
+    date: string;
+    requester: string;
+    department: string;
+    purpose?: string;
+}
+
+type ReturnData = {
+    items: { id: string; quantity: number }[];
+    date: string;
+    department: string;
+    reason: string;
+    responsible: string;
+}
+
 
 // Product Functions
 const productsCollection = collection(db, 'products');
@@ -62,7 +78,6 @@ export const updateProductQuantityOnEntry = async (productId: string, quantity: 
         quantity: increment(quantity)
     });
 };
-
 
 export const finalizeEntry = async (entryData: EntryData): Promise<void> => {
     try {
@@ -92,10 +107,70 @@ export const finalizeEntry = async (entryData: EntryData): Promise<void> => {
                 transaction.set(movementRef, movementData);
             }
         });
-        console.log("Transaction successfully committed!");
     } catch (e) {
         console.error("Transaction failed: ", e);
         throw e; // Re-throw the error to be caught by the calling function
+    }
+};
+
+export const finalizeExit = async (exitData: ExitData): Promise<void> => {
+    try {
+        await runTransaction(db, async (transaction) => {
+            for (const item of exitData.items) {
+                const productRef = doc(db, "products", item.id);
+                const productDoc = await transaction.get(productRef);
+
+                if (!productDoc.exists() || productDoc.data().quantity < item.quantity) {
+                    throw new Error(`Insufficient stock for product ID ${item.id}.`);
+                }
+
+                // Decrement product quantity
+                transaction.update(productRef, { quantity: increment(-item.quantity) });
+
+                // Create movement record
+                const movementData: Omit<Movement, 'id'> = {
+                    productId: item.id,
+                    date: exitData.date,
+                    type: 'Saída',
+                    quantity: item.quantity,
+                    responsible: exitData.requester,
+                    department: exitData.department
+                };
+                const movementRef = doc(collection(db, "movements"));
+                transaction.set(movementRef, movementData);
+            }
+        });
+    } catch (e) {
+        console.error("Transaction failed: ", e);
+        throw e;
+    }
+};
+
+export const finalizeReturn = async (returnData: ReturnData): Promise<void> => {
+     try {
+        await runTransaction(db, async (transaction) => {
+            for (const item of returnData.items) {
+                const productRef = doc(db, "products", item.id);
+
+                // Increment product quantity
+                transaction.update(productRef, { quantity: increment(item.quantity) });
+
+                // Create movement record
+                const movementData: Omit<Movement, 'id'> = {
+                    productId: item.id,
+                    date: returnData.date,
+                    type: 'Devolução',
+                    quantity: item.quantity,
+                    responsible: returnData.responsible,
+                    department: returnData.department
+                };
+                const movementRef = doc(collection(db, "movements"));
+                transaction.set(movementRef, movementData);
+            }
+        });
+    } catch (e) {
+        console.error("Transaction failed: ", e);
+        throw e;
     }
 };
 
