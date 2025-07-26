@@ -41,6 +41,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { AddItemSheet } from "./components/add-item-sheet";
 import { EditItemSheet } from "./components/edit-item-sheet";
+import { useToast } from "@/hooks/use-toast";
 
 const initialProducts = [
   {
@@ -109,13 +110,40 @@ export default function InventoryPage() {
   const [isEditSheetOpen, setIsEditSheetOpen] = React.useState(false);
   const [selectedItem, setSelectedItem] = React.useState<any>(null);
   const [itemToDelete, setItemToDelete] = React.useState<any>(null);
+  const { toast } = useToast();
 
 
   const handleAddItem = (newItemData: any) => {
+    const itemCode = newItemData.itemCode?.trim();
+
+    if (itemCode) {
+      const existingProductIndex = products.findIndex(p => p.code === itemCode && p.type === newItemData.materialType && p.name === newItemData.name);
+
+      if (existingProductIndex > -1) {
+        setProducts(prevProducts => {
+          const newProducts = [...prevProducts];
+          const existingProduct = newProducts[existingProductIndex];
+          existingProduct.quantity += newItemData.initialQuantity;
+
+          if (newItemData.image instanceof File) {
+            existingProduct.imagePreview = URL.createObjectURL(newItemData.image);
+          }
+          
+          toast({
+            title: "Estoque Atualizado!",
+            description: `A quantidade de ${existingProduct.name} foi atualizada.`,
+          });
+
+          return newProducts;
+        });
+        return;
+      }
+    }
+    
     const newItem: Product = {
         id: (products.length + 1).toString(),
         name: newItemData.name,
-        code: newItemData.itemCode || `00${products.length + 1}-25`,
+        code: itemCode || `00${products.length + 1}-25`,
         patrimony: newItemData.materialType === 'permanente' ? newItemData.patrimony : 'N/A',
         type: newItemData.materialType,
         quantity: newItemData.initialQuantity,
