@@ -87,7 +87,12 @@ export default function DashboardPage() {
         newFilteredMovements = newFilteredMovements.filter(m => {
             const movementDate = parseISO(m.date);
             if (!isValid(movementDate)) return false;
-            return movementDate >= date.from! && movementDate <= date.to!;
+            // Set time to beginning of the day for `from` and end of the day for `to`
+            const fromDate = new Date(date.from!);
+            fromDate.setHours(0, 0, 0, 0);
+            const toDate = new Date(date.to!);
+            toDate.setHours(23, 59, 59, 999);
+            return movementDate >= fromDate && movementDate <= toDate;
         });
     }
 
@@ -168,6 +173,7 @@ export default function DashboardPage() {
   const movementsByDay = React.useMemo(() => {
     const dailyData: Record<string, { Entrada: number; Saída: number }> = {};
     filteredMovements.forEach((mov) => {
+      if (!isValid(parseISO(mov.date))) return;
       const day = format(parseISO(mov.date), "dd/MM");
       if (!dailyData[day]) {
         dailyData[day] = { Entrada: 0, Saída: 0 };
@@ -204,7 +210,7 @@ export default function DashboardPage() {
         const rows = filteredMovements.map(mov => {
             const product = products.find(p => p.id === mov.productId);
             return [
-                format(parseISO(mov.date), "dd/MM/yyyy HH:mm"),
+                isValid(parseISO(mov.date)) ? format(parseISO(mov.date), "dd/MM/yyyy HH:mm") : 'Data Inválida',
                 mov.type,
                 product?.name || 'N/A',
                 mov.quantity,
