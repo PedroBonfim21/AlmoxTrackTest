@@ -52,7 +52,7 @@ export default function DashboardLayout({
   const navItems = [
     { href: "/dashboard", icon: LayoutDashboard, label: "Painel" },
     { href: "/dashboard/inventory", icon: Package, label: "Inventário" },
-    { href: "#", icon: ArrowRightToLine, label: "Entrada" },
+    { href: "/dashboard/entry", icon: ArrowRightToLine, label: "Entrada" },
     { href: "#", icon: ArrowLeftFromLine, label: "Saída" },
     { href: "#", icon: ChevronsLeftRight, label: "Devolução" },
   ];
@@ -104,11 +104,11 @@ export default function DashboardLayout({
                  <div className="flex justify-between w-full items-center">
                     <div className="flex gap-2 items-center">
                        <Avatar className="w-8 h-8">
-                         <AvatarFallback>A</AvatarFallback>
+                         <AvatarFallback>S</AvatarFallback>
                        </Avatar>
                        <div className="flex flex-col items-start text-sm">
-                         <span className="font-medium text-sidebar-foreground">Admin</span>
-                         <span className="text-muted-foreground text-xs">admin@email.com</span>
+                         <span className="font-medium text-sidebar-foreground">sdpinho29</span>
+                         <span className="text-muted-foreground text-xs">sdpinho29@gmail.com</span>
                        </div>
                     </div>
                  </div>
