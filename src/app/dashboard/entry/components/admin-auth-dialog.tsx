@@ -26,7 +26,7 @@ export function AdminAuthDialog({ isOpen, onOpenChange, onAuthSuccess }: AdminAu
 
   const handleAuthentication = () => {
     // In a real app, this would involve an API call to verify admin credentials
-    if (password === "admin") { // Mock password
+    if (password === "Alv1123246") { // Mock password
       toast({
         title: "Autenticação bem-sucedida!",
         description: "Permissão de administrador concedida.",

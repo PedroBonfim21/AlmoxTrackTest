@@ -35,10 +35,10 @@ export function AdminSyncAuthDialog({ isOpen, onOpenChange, onAuthSuccess }: Adm
       const result = await signInWithPopup(auth, provider);
       const credential = GoogleAuthProvider.credentialFromResult(result);
       
-      if (result.user.email !== "admin@gmail.com") {
+      if (result.user.email !== "sdpinho29@gmail.com") {
         toast({
             title: "Authentication Failed",
-            description: "Only the admin user (admin@gmail.com) can sync the spreadsheet.",
+            description: "Only the admin user (sdpinho29@gmail.com) can sync the spreadsheet.",
             variant: "destructive",
         });
         setIsAuthenticating(false);
@@ -76,7 +76,7 @@ export function AdminSyncAuthDialog({ isOpen, onOpenChange, onAuthSuccess }: Adm
         <div className="py-4">
             <p className="text-sm text-muted-foreground">
                 You will be prompted to sign in with your Google account to authorize access to Google Sheets.
-                For this demo, please use `admin@gmail.com` as the user.
+                For this demo, please use `sdpinho29@gmail.com` as the user.
             </p>
         </div>
         <DialogFooter>
