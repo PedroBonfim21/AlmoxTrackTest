@@ -158,8 +158,14 @@ export default function EntryPage() {
             description: `${newProductData.name} foi adicionado ao inventário.`,
         });
         
+        // Add the new item with its initial quantity to the received items list
         if (newItemData.initialQuantity > 0) {
-            setReceivedItems(prev => [...prev, { id: newProductWithId.id, name: newProductWithId.name, quantity: newItemData.initialQuantity, unit: newProductWithId.unit }]);
+            setReceivedItems(prev => [...prev, {
+                id: newProductWithId.id,
+                name: newProductWithId.name,
+                quantity: newItemData.initialQuantity,
+                unit: newProductWithId.unit
+            }]);
         }
         setIsLoading(false);
     };
