@@ -26,21 +26,21 @@ import {
 import { Badge } from "@/components/ui/badge";
 
 const mockMovements = [
-    { id: '1', date: '2024-05-20T10:00:00Z', type: 'Entrada', quantity: 50, responsible: 'João Silva' },
-    { id: '2', date: '2024-05-21T14:30:00Z', type: 'Saída', quantity: 10, responsible: 'Maria Oliveira' },
-    { id: '3', date: '2024-05-22T09:15:00Z', type: 'Saída', quantity: 5, responsible: 'Carlos Pereira' },
-    { id: '4', date: '2024-05-23T11:00:00Z', type: 'Entrada', quantity: 20, responsible: 'João Silva' },
-    { id: '5', date: '2024-05-24T16:45:00Z', type: 'Devolução', quantity: 2, responsible: 'Ana Costa' },
+    { id: '1', date: '2024-05-20T07:00:00Z', type: 'Entrada', quantity: 50, responsible: 'João Silva' },
+    { id: '2', date: '2024-05-21T11:30:00Z', type: 'Saída', quantity: 10, responsible: 'Maria Oliveira' },
+    { id: '3', date: '2024-05-22T06:15:00Z', type: 'Saída', quantity: 5, responsible: 'Carlos Pereira' },
+    { id: '4', date: '2024-05-23T08:00:00Z', type: 'Entrada', quantity: 20, responsible: 'João Silva' },
+    { id: '5', date: '2024-05-24T13:45:00Z', type: 'Devolução', quantity: 2, responsible: 'Ana Costa' },
 ];
 
 const getBadgeVariant = (type: string) => {
     switch (type) {
       case 'Entrada':
-        return 'bg-green-100 text-green-800';
+        return 'bg-green-100 text-green-800 border-green-200 hover:bg-green-200';
       case 'Saída':
-        return 'bg-red-100 text-red-800';
+        return 'bg-red-100 text-red-800 border-red-200 hover:bg-red-200';
       case 'Devolução':
-        return 'bg-yellow-100 text-yellow-800';
+        return 'bg-yellow-100 text-yellow-800 border-yellow-200 hover:bg-yellow-200';
       default:
         return 'outline';
     }
@@ -85,7 +85,7 @@ export function MovementsSheet({ isOpen, onOpenChange, item }: MovementsSheetPro
                     <TableRow key={movement.id}>
                       <TableCell>{format(new Date(movement.date), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</TableCell>
                       <TableCell>
-                        <Badge variant="outline" className={cn(getBadgeVariant(movement.type))}>
+                        <Badge variant="outline" className={cn('font-normal', getBadgeVariant(movement.type))}>
                             {movement.type}
                         </Badge>
                       </TableCell>
