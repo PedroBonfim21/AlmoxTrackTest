@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -44,9 +45,7 @@ import { AddItemSheet } from "../inventory/components/add-item-sheet";
 import { AdminAuthDialog } from "./components/admin-auth-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { products as allProducts, movements as allMovements, addMovement } from "@/lib/mock-data";
-
-type Product = (typeof allProducts)[0];
+import { Product, Movement, getProducts, addProduct, updateProduct, addMovement } from "@/lib/firestore";
 
 type ReceivedItem = {
     id: string;
@@ -60,7 +59,8 @@ const currentUserRole = "Operator";
 
 export default function EntryPage() {
     const { toast } = useToast();
-    const [entryDate, setEntryDate] = React.useState<Date | undefined>(undefined);
+    const [allProducts, setAllProducts] = React.useState<Product[]>([]);
+    const [entryDate, setEntryDate] = React.useState<Date | undefined>(new Date());
     const [supplier, setSupplier] = React.useState("");
     const [invoice, setInvoice] = React.useState("");
     
@@ -72,13 +72,18 @@ export default function EntryPage() {
     
     const [isAddItemSheetOpen, setIsAddItemSheetOpen] = React.useState(false);
     const [isAuthDialogOpen, setIsAuthDialogOpen] = React.useState(false);
-    
-    React.useEffect(() => {
-        setEntryDate(new Date());
-    }, []);
 
     React.useEffect(() => {
-       if (searchTerm.trim()) {
+        const fetchProducts = async () => {
+            const productsFromDb = await getProducts();
+            setAllProducts(productsFromDb);
+        };
+        fetchProducts();
+    }, []);
+    
+
+    React.useEffect(() => {
+       if (searchTerm.trim() && allProducts.length > 0) {
             const lowerCaseSearchTerm = searchTerm.toLowerCase();
             const results = allProducts.filter(item =>
                 item.name.toLowerCase().includes(lowerCaseSearchTerm) ||
@@ -90,7 +95,7 @@ export default function EntryPage() {
             setSearchResults([]);
             setIsSearchOpen(false);
        }
-    }, [searchTerm]);
+    }, [searchTerm, allProducts]);
 
     const handleSelectSearchItem = (item: Product) => {
         setSearchTerm(item.name);
@@ -142,26 +147,29 @@ export default function EntryPage() {
         setReceivedItems(prev => prev.filter(item => item.id !== itemId));
     };
 
-    const handleItemAdded = (newItemData: any) => {
-        const newItem = {
-            id: (allProducts.length + 1).toString(),
+    const handleItemAdded = async (newItemData: any) => {
+        const newItem: Omit<Product, 'id'> = {
             name: newItemData.name,
             code: newItemData.itemCode || `new-${allProducts.length + 1}`,
             unit: newItemData.unit,
             patrimony: newItemData.materialType === 'permanente' ? newItemData.patrimony : 'N/A',
             type: newItemData.materialType,
-            quantity: newItemData.initialQuantity,
+            quantity: 0, // Initial quantity is 0, will be updated by the entry
             category: newItemData.category,
             image: "https://placehold.co/40x40.png"
         };
-        allProducts.push(newItem); //
+        const newProductId = await addProduct(newItem);
+        const newProductWithId = { id: newProductId, ...newItem };
+
+        setAllProducts(prev => [...prev, newProductWithId]);
+        
         toast({
             title: "Item Adicionado!",
             description: `${newItem.name} foi adicionado ao inventário.`,
         });
         
-        if (newItem.quantity > 0) {
-            setReceivedItems(prev => [...prev, { id: newItem.id, name: newItem.name, quantity: newItem.quantity, unit: newItem.unit }]);
+        if (newItemData.initialQuantity > 0) {
+            setReceivedItems(prev => [...prev, { id: newProductId, name: newItem.name, quantity: newItemData.initialQuantity, unit: newItem.unit }]);
         }
     };
 
@@ -170,7 +178,7 @@ export default function EntryPage() {
         setIsAddItemSheetOpen(true);
     };
 
-    const handleFinalizeEntry = () => {
+    const handleFinalizeEntry = async () => {
         if (receivedItems.length === 0) {
             toast({
                 title: "Nenhum item adicionado",
@@ -180,19 +188,25 @@ export default function EntryPage() {
             return;
         }
         
-        receivedItems.forEach(item => {
-            const productIndex = allProducts.findIndex(p => p.id === item.id);
-            if (productIndex !== -1) {
-                allProducts[productIndex].quantity += item.quantity;
+        for (const item of receivedItems) {
+            const product = allProducts.find(p => p.id === item.id);
+            if (product && product.id) {
+                const newQuantity = product.quantity + item.quantity;
+                await updateProduct(product.id, { quantity: newQuantity });
             }
-            addMovement({
+
+            const movement: Omit<Movement, 'id'> = {
                 productId: item.id,
                 date: new Date().toISOString(),
                 type: 'Entrada',
                 quantity: item.quantity,
-                responsible: 'sdpinho29' 
-            });
-        });
+                responsible: 'sdpinho29' // Mock responsible user
+            };
+            await addMovement(movement);
+        }
+        
+        const updatedProducts = await getProducts();
+        setAllProducts(updatedProducts);
         
         toast({
             title: "Entrada Registrada!",
@@ -281,7 +295,7 @@ export default function EntryPage() {
                                                 onClick={() => handleSelectSearchItem(item)}
                                             >
                                                 <Image 
-                                                    src={item.image}
+                                                    src={item.image || "https://placehold.co/40x40.png"}
                                                     alt={item.name}
                                                     width={40}
                                                     height={40}

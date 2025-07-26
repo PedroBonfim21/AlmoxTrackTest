@@ -46,19 +46,19 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { products as allProducts, addMovement } from "@/lib/mock-data";
+import { Product, Movement, getProducts, updateProduct, addMovement } from "@/lib/firestore";
 
 type RequestedItem = {
     id: string;
     name: string;
     quantity: number;
     unit: string;
+    patrimony: string;
 };
-
-type Product = (typeof allProducts)[0];
 
 export default function ExitPage() {
     const { toast } = useToast();
+    const [allProducts, setAllProducts] = React.useState<Product[]>([]);
     const [activeTab, setActiveTab] = React.useState("consumption");
 
     // State for Consumption Tab
@@ -71,7 +71,7 @@ export default function ExitPage() {
     const [consumptionSearchResults, setConsumptionSearchResults] = React.useState<Product[]>([]);
     const [isConsumptionSearchOpen, setIsConsumptionSearchOpen] = React.useState(false);
     const [consumptionQuantity, setConsumptionQuantity] = React.useState(1);
-    const [requestedItems, setRequestedItems] = React.useState<RequestedItem[]>([]);
+    const [requestedItems, setRequestedItems] = React.useState<Omit<RequestedItem, 'patrimony'>[]>([]);
 
     // State for Responsibility Tab
     const [responsibilityDate, setResponsibilityDate] = React.useState<Date | undefined>(new Date());
@@ -87,6 +87,14 @@ export default function ExitPage() {
     const [isConfirmDialogOpen, setIsConfirmDialogOpen] = React.useState(false);
     const [isTermAccepted, setIsTermAccepted] = React.useState(false);
     
+    React.useEffect(() => {
+        const fetchProducts = async () => {
+            const productsFromDb = await getProducts();
+            setAllProducts(productsFromDb);
+        };
+        fetchProducts();
+    }, []);
+
     const consumableItems = allProducts.filter(p => p.type === 'consumo');
     const permanentItems = allProducts.filter(p => p.type === 'permanente');
 
@@ -102,7 +110,7 @@ export default function ExitPage() {
             setConsumptionSearchResults([]);
             setIsConsumptionSearchOpen(false);
         }
-    }, [consumptionSearchTerm]);
+    }, [consumptionSearchTerm, consumableItems]);
 
      React.useEffect(() => {
         if (responsibilitySearchTerm.trim()) {
@@ -116,7 +124,7 @@ export default function ExitPage() {
             setResponsibilitySearchResults([]);
             setIsResponsibilitySearchOpen(false);
         }
-    }, [responsibilitySearchTerm]);
+    }, [responsibilitySearchTerm, permanentItems]);
     
     const handleSelectSearchItem = (item: Product, type: 'consumption' | 'responsibility') => {
         if (type === 'consumption') {
@@ -145,7 +153,7 @@ export default function ExitPage() {
             i.code.toLowerCase() === searchTerm.toLowerCase()
         );
 
-        if (!item) {
+        if (!item || !item.id) {
             toast({ title: "Item não encontrado", description: `O item buscado não existe no estoque de ${type === 'consumption' ? 'consumo' : 'permanente'}.`, variant: "destructive" });
             return;
         }
@@ -160,17 +168,18 @@ export default function ExitPage() {
             return;
         }
 
-        setRequestedItemsFn(prev => {
-            const existing = prev.find(i => i.id === item.id);
+        setRequestedItemsFn((prev: any) => {
+            const existing = prev.find((i: { id: string; }) => i.id === item.id);
             if (existing) {
                 const newQuantity = existing.quantity + quantity;
                 if (item.quantity < newQuantity) {
                     toast({ title: "Estoque insuficiente", description: `A quantidade total solicitada (${newQuantity}) é maior que a disponível (${item.quantity}).`, variant: "destructive" });
                     return prev;
                 }
-                return prev.map(i => i.id === item.id ? { ...i, quantity: newQuantity } : i);
+                return prev.map((i: { id: string; }) => i.id === item.id ? { ...i, quantity: newQuantity } : i);
             }
-            return [...prev, { id: item.id, name: item.name, quantity, unit: item.unit }];
+            const newItem = { id: item.id, name: item.name, quantity, unit: item.unit, patrimony: item.patrimony };
+            return [...prev, newItem];
         });
 
         if (type === 'consumption') {
@@ -187,7 +196,7 @@ export default function ExitPage() {
         setRequestedItemsFn(prev => prev.filter(item => item.id !== itemId));
     };
 
-    const handleFinalizeIssue = () => {
+    const handleFinalizeIssue = async () => {
         if (requestedItems.length === 0) {
             toast({ title: "Nenhum item solicitado", description: "Adicione pelo menos um item para registrar a saída.", variant: "destructive" });
             return;
@@ -198,19 +207,25 @@ export default function ExitPage() {
             return;
         }
         
-        requestedItems.forEach(item => {
-            const productIndex = allProducts.findIndex(p => p.id === item.id);
-            if (productIndex !== -1) {
-                allProducts[productIndex].quantity -= item.quantity;
+        for (const item of requestedItems) {
+            const product = allProducts.find(p => p.id === item.id);
+            if (product && product.id) {
+                const newQuantity = product.quantity - item.quantity;
+                await updateProduct(product.id, { quantity: newQuantity });
             }
-            addMovement({
+            const movement: Omit<Movement, 'id'> = {
                 productId: item.id,
                 date: new Date().toISOString(),
                 type: 'Saída',
                 quantity: item.quantity,
-                responsible: requesterName
-            });
-        });
+                responsible: requesterName,
+                department: department,
+            };
+            await addMovement(movement);
+        }
+        
+        const updatedProducts = await getProducts();
+        setAllProducts(updatedProducts);
         
         toast({ title: "Saída Registrada!", description: "A saída de materiais de consumo foi registrada com sucesso." });
 
@@ -236,30 +251,34 @@ export default function ExitPage() {
         setIsConfirmDialogOpen(true);
     };
 
-    const handlePrintAndFinalize = (e: React.MouseEvent<HTMLButtonElement>) => {
+    const handlePrintAndFinalize = async (e: React.MouseEvent<HTMLButtonElement>) => {
         e.preventDefault();
-        // Finalize the stock removal
-        responsibilityItems.forEach(item => {
-            const productIndex = allProducts.findIndex(p => p.id === item.id);
-            if (productIndex !== -1) {
-                allProducts[productIndex].quantity -= item.quantity;
+        
+        for (const item of responsibilityItems) {
+             const product = allProducts.find(p => p.id === item.id);
+            if (product && product.id) {
+                const newQuantity = product.quantity - item.quantity;
+                await updateProduct(product.id, { quantity: newQuantity });
             }
-            addMovement({
+            const movement: Omit<Movement, 'id'> = {
                 productId: item.id,
                 date: new Date().toISOString(),
                 type: 'Saída',
                 quantity: item.quantity,
-                responsible: responsibleName
-            });
-        });
+                responsible: responsibleName,
+                department: responsibilityDepartment
+            };
+            await addMovement(movement);
+        }
 
         toast({ title: "Termo Gerado e Saída Registrada!", description: "A saída de material permanente foi registrada com sucesso." });
         
-        // Trigger browser print dialog
-        setTimeout(() => {
+        setTimeout(async () => {
             window.print();
             
             // Reset form after printing
+            const updatedProducts = await getProducts();
+            setAllProducts(updatedProducts);
             setIsConfirmDialogOpen(false);
             setResponsibilityDate(new Date());
             setResponsibleName("");
@@ -342,7 +361,7 @@ export default function ExitPage() {
                                                                 onClick={() => handleSelectSearchItem(item, 'consumption')}
                                                             >
                                                                 <Image 
-                                                                    src={item.image}
+                                                                    src={item.image || "https://placehold.co/40x40.png"}
                                                                     alt={item.name}
                                                                     width={40}
                                                                     height={40}
@@ -471,7 +490,7 @@ export default function ExitPage() {
                                                                 onClick={() => handleSelectSearchItem(item, 'responsibility')}
                                                             >
                                                                 <Image 
-                                                                    src={item.image}
+                                                                    src={item.image || "https://placehold.co/40x40.png"}
                                                                     alt={item.name}
                                                                     width={40}
                                                                     height={40}
@@ -562,10 +581,9 @@ export default function ExitPage() {
                                     </TableHeader>
                                     <TableBody>
                                         {responsibilityItems.map(reqItem => {
-                                            const product = allProducts.find(p => p.id === reqItem.id);
                                             return (
                                                 <TableRow key={reqItem.id}>
-                                                    <TableCell>{product?.patrimony || 'N/A'}</TableCell>
+                                                    <TableCell>{reqItem.patrimony || 'N/A'}</TableCell>
                                                     <TableCell>{reqItem.name}</TableCell>
                                                     <TableCell>N/A</TableCell>
                                                 </TableRow>

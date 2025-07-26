@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -8,7 +9,6 @@ import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -43,50 +43,51 @@ import { AddItemSheet } from "./components/add-item-sheet";
 import { EditItemSheet } from "./components/edit-item-sheet";
 import { MovementsSheet } from "./components/movements-sheet";
 import { useToast } from "@/hooks/use-toast";
-import { products as initialProducts } from "@/lib/mock-data";
+import { Product, getProducts, addProduct, updateProduct, deleteProduct, addMovement } from "@/lib/firestore";
+import { movements as allMovements } from "@/lib/mock-data";
 
-type Product = typeof initialProducts[0] & { imagePreview?: string };
 
 export default function InventoryPage() {
-  const [products, setProducts] = React.useState<Product[]>(initialProducts);
+  const [products, setProducts] = React.useState<Product[]>([]);
   const [searchTerm, setSearchTerm] = React.useState("");
   const [isAddSheetOpen, setIsAddSheetOpen] = React.useState(false);
   const [isEditSheetOpen, setIsEditSheetOpen] = React.useState(false);
   const [isMovementsSheetOpen, setIsMovementsSheetOpen] = React.useState(false);
-  const [selectedItem, setSelectedItem] = React.useState<any>(null);
-  const [itemToDelete, setItemToDelete] = React.useState<any>(null);
+  const [selectedItem, setSelectedItem] = React.useState<Product | null>(null);
+  const [itemToDelete, setItemToDelete] = React.useState<Product | null>(null);
   const { toast } = useToast();
 
+  React.useEffect(() => {
+    const fetchProducts = async () => {
+        const productsFromDb = await getProducts();
+        setProducts(productsFromDb);
+    };
+    fetchProducts();
+  }, []);
 
-  const handleAddItem = React.useCallback((newItemData: any) => {
+
+  const handleAddItem = React.useCallback(async (newItemData: any) => {
     const itemCode = newItemData.itemCode?.trim();
-
+    
+    // In a real app with a backend, this logic would be more robust.
+    // For now, we simulate checking if an item with the same code exists.
     if (itemCode) {
-      const existingProductIndex = products.findIndex(p => p.code === itemCode);
-      if (existingProductIndex > -1) {
-          setProducts(prevProducts => {
-              const newProducts = [...prevProducts];
-              const existingProduct = newProducts[existingProductIndex];
-              
-              existingProduct.quantity += newItemData.initialQuantity;
-              
-              if (newItemData.image instanceof File) {
-                  existingProduct.imagePreview = URL.createObjectURL(newItemData.image);
-              }
-              
-              toast({
-                  title: "Estoque Atualizado!",
-                  description: `A quantidade de ${existingProduct.name} foi atualizada.`,
-              });
-              
-              return newProducts;
+      const existingProduct = products.find(p => p.code === itemCode);
+      if (existingProduct && existingProduct.id) {
+          const updatedQuantity = existingProduct.quantity + newItemData.initialQuantity;
+          await updateProduct(existingProduct.id, { quantity: updatedQuantity });
+          
+          setProducts(prevProducts => prevProducts.map(p => p.id === existingProduct.id ? {...p, quantity: updatedQuantity} : p));
+
+          toast({
+              title: "Estoque Atualizado!",
+              description: `A quantidade de ${existingProduct.name} foi atualizada.`,
           });
           return;
       }
     }
     
-    const newItem: Product = {
-        id: (products.length + 1).toString(),
+    const newItem: Omit<Product, 'id'> = {
         name: newItemData.name,
         code: itemCode || `00${products.length + 1}-25`,
         patrimony: newItemData.materialType === 'permanente' ? newItemData.patrimony : 'N/A',
@@ -96,50 +97,56 @@ export default function InventoryPage() {
         category: newItemData.category,
         image: "https://placehold.co/40x40.png"
     };
-    
-    if (newItemData.image instanceof File) {
-        newItem.imagePreview = URL.createObjectURL(newItemData.image);
-    }
 
-    setProducts(prevProducts => [...prevProducts, newItem]);
+    const newProductId = await addProduct(newItem);
+    setProducts(prevProducts => [...prevProducts, { id: newProductId, ...newItem }]);
+
   }, [products, toast]);
   
-  const handleUpdateItem = (updatedItemData: any) => {
+  const handleUpdateItem = async (updatedItemData: any) => {
+    if (!selectedItem || !selectedItem.id) return;
+
+    const updatedProductData = {
+        name: updatedItemData.name,
+        type: updatedItemData.materialType,
+        code: updatedItemData.itemCode,
+        patrimony: updatedItemData.materialType === 'permanente' ? updatedItemData.patrimony : 'N/A',
+        unit: updatedItemData.unit,
+        quantity: updatedItemData.quantity,
+        category: updatedItemData.category,
+        // Image update logic would go here if we were handling uploads
+    };
+
+    await updateProduct(selectedItem.id, updatedProductData);
+    
     setProducts(prevProducts =>
-        prevProducts.map(p => {
-            if (p.id === selectedItem.id) {
-                const updatedProduct: Product = {
-                    ...p,
-                    name: updatedItemData.name,
-                    type: updatedItemData.materialType,
-                    code: updatedItemData.itemCode,
-                    patrimony: updatedItemData.materialType === 'permanente' ? updatedItemData.patrimony : 'N/A',
-                    unit: updatedItemData.unit,
-                    quantity: updatedItemData.quantity,
-                    category: updatedItemData.category,
-                };
-                if (updatedItemData.image instanceof File) {
-                    updatedProduct.imagePreview = URL.createObjectURL(updatedItemData.image);
-                }
-                return updatedProduct;
-            }
-            return p;
-        })
+        prevProducts.map(p => 
+            p.id === selectedItem.id ? { ...p, ...updatedProductData } : p
+        )
     );
+     toast({
+      title: "Item Atualizado!",
+      description: `${updatedItemData.name} foi atualizado com sucesso.`,
+    });
   };
   
-  const handleDeleteItem = (productId: string) => {
+  const handleDeleteItem = async (productId: string) => {
+    await deleteProduct(productId);
     setProducts(prevProducts => prevProducts.filter(p => p.id !== productId));
     setItemToDelete(null);
+    toast({
+        title: "Item Excluído!",
+        description: "O item foi removido do inventário.",
+    });
   };
 
 
-  const handleEditClick = (product: any) => {
+  const handleEditClick = (product: Product) => {
     setSelectedItem(product);
     setIsEditSheetOpen(true);
   };
 
-  const handleMovementsClick = (product: any) => {
+  const handleMovementsClick = (product: Product) => {
     setSelectedItem(product);
     setIsMovementsSheetOpen(true);
   };
@@ -196,7 +203,7 @@ export default function InventoryPage() {
                     <TableRow key={product.id}>
                       <TableCell>
                         <Image
-                          src={product.imagePreview || product.image}
+                          src={product.image || "https://placehold.co/40x40.png"}
                           alt={product.name}
                           width={40}
                           height={40}
@@ -276,7 +283,7 @@ export default function InventoryPage() {
           item={selectedItem}
         />
       )}
-       {itemToDelete && (
+       {itemToDelete && itemToDelete.id && (
         <AlertDialog open={!!itemToDelete} onOpenChange={() => setItemToDelete(null)}>
           <AlertDialogContent>
             <AlertDialogHeader>
@@ -290,7 +297,7 @@ export default function InventoryPage() {
             <AlertDialogFooter>
               <AlertDialogCancel>Cancelar</AlertDialogCancel>
               <AlertDialogAction
-                onClick={() => handleDeleteItem(itemToDelete.id)}
+                onClick={() => handleDeleteItem(itemToDelete.id!)}
                 className="bg-red-600 hover:bg-red-700"
               >
                 Sim, excluir

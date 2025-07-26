@@ -30,11 +30,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { products, movements as allMovements } from "@/lib/mock-data";
+import { Product, Movement, getProducts, getMovements } from "@/lib/firestore";
 
 const COLORS = ["#4553a4", "#00acad", "#ffc20e"];
 
 export default function DashboardPage() {
+    // Data state
+    const [products, setProducts] = React.useState<Product[]>([]);
+    const [allMovements, setAllMovements] = React.useState<Movement[]>([]);
+    const [filteredMovements, setFilteredMovements] = React.useState<Movement[]>([]);
+
     // Filter states
     const [startDate, setStartDate] = React.useState<Date | undefined>(
         new Date(new Date().setMonth(new Date().getMonth() - 1))
@@ -43,9 +48,16 @@ export default function DashboardPage() {
     const [movementType, setMovementType] = React.useState("all");
     const [materialType, setMaterialType] = React.useState("all");
 
-    // Data state
-    const [filteredMovements, setFilteredMovements] = React.useState(allMovements);
-    
+    React.useEffect(() => {
+        const fetchData = async () => {
+            const [productsData, movementsData] = await Promise.all([getProducts(), getMovements()]);
+            setProducts(productsData);
+            setAllMovements(movementsData);
+            setFilteredMovements(movementsData); // Initially show all movements
+        };
+        fetchData();
+    }, []);
+
     const handleApplyFilters = () => {
         let newFilteredMovements = allMovements;
 
@@ -53,7 +65,6 @@ export default function DashboardPage() {
         if (startDate && endDate) {
             newFilteredMovements = newFilteredMovements.filter(m => {
                 const movementDate = new Date(m.date);
-                // Set hours to 0 to compare dates only
                 const fromDate = new Date(startDate!);
                 fromDate.setHours(0, 0, 0, 0);
                 const toDate = new Date(endDate!);
@@ -75,19 +86,19 @@ export default function DashboardPage() {
         
         setFilteredMovements(newFilteredMovements);
     };
-
+    
+    // Apply filters on initial load
     React.useEffect(() => {
-        // Initial data load based on default filters
         handleApplyFilters();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    }, [allMovements]); // Rerun when allMovements is fetched
 
     const totalMovements = filteredMovements.length;
     const totalEntries = filteredMovements.filter(m => m.type === 'Entrada').length;
     const totalExits = filteredMovements.filter(m => m.type === 'Saída').length;
 
     const mostMovedItem = React.useMemo(() => {
-        if (filteredMovements.length === 0) return { name: 'N/A', count: 0 };
+        if (filteredMovements.length === 0 || products.length === 0) return { name: 'N/A', count: 0 };
         const counts = filteredMovements.reduce((acc, mov) => {
             acc[mov.productId] = (acc[mov.productId] || 0) + 1;
             return acc;
@@ -97,7 +108,7 @@ export default function DashboardPage() {
         const mostMovedId = Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b);
         const product = products.find(p => p.id === mostMovedId);
         return { name: product?.name || 'N/A', count: counts[mostMovedId] };
-    }, [filteredMovements]);
+    }, [filteredMovements, products]);
 
     const topSector = React.useMemo(() => {
         const exitMovements = filteredMovements.filter(m => m.type === 'Saída' && m.department);
@@ -128,6 +139,7 @@ export default function DashboardPage() {
     }, [filteredMovements]);
 
     const top10Items = React.useMemo(() => {
+        if (products.length === 0) return [];
         const counts = filteredMovements.reduce((acc, mov) => {
             acc[mov.productId] = (acc[mov.productId] || 0) + 1;
             return acc;
@@ -140,7 +152,7 @@ export default function DashboardPage() {
             }))
             .sort((a, b) => b.count - a.count)
             .slice(0, 10);
-    }, [filteredMovements]);
+    }, [filteredMovements, products]);
     
     const handleExport = () => {
         let csvContent = "data:text/csv;charset=utf-8,";
@@ -337,7 +349,7 @@ export default function DashboardPage() {
             <CardHeader>
                 <CardTitle>Top 10 Itens Mais Movimentados</CardTitle>
                 <CardDescription>Itens com maior volume de entradas e saídas.</CardDescription>
-            </CardHeader>
+            </Header>
             <CardContent>
                  {top10Items.length > 0 ? (
                     <ResponsiveContainer width="100%" height={300}>

@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -38,9 +39,8 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { products as allProducts, addMovement } from "@/lib/mock-data";
+import { Product, Movement, getProducts, updateProduct, addMovement } from "@/lib/firestore";
 
-type Product = (typeof allProducts)[0];
 
 type ReturnedItem = {
     id: string;
@@ -51,6 +51,7 @@ type ReturnedItem = {
 
 export default function ReturnsPage() {
     const { toast } = useToast();
+    const [allProducts, setAllProducts] = React.useState<Product[]>([]);
     const [returnDate, setReturnDate] = React.useState<Date | undefined>(new Date());
     const [returningDepartment, setReturningDepartment] = React.useState("");
     const [returnReason, setReturnReason] = React.useState("");
@@ -59,9 +60,17 @@ export default function ReturnsPage() {
     const [returnedItems, setReturnedItems] = React.useState<ReturnedItem[]>([]);
     const [searchResults, setSearchResults] = React.useState<Product[]>([]);
     const [isSearchOpen, setIsSearchOpen] = React.useState(false);
+
+    React.useEffect(() => {
+        const fetchProducts = async () => {
+            const productsFromDb = await getProducts();
+            setAllProducts(productsFromDb);
+        };
+        fetchProducts();
+    }, []);
     
     React.useEffect(() => {
-        if (searchTerm.trim()) {
+        if (searchTerm.trim() && allProducts.length > 0) {
             const lowerCaseSearchTerm = searchTerm.toLowerCase();
             const results = allProducts.filter(item =>
                 item.name.toLowerCase().includes(lowerCaseSearchTerm) ||
@@ -73,7 +82,7 @@ export default function ReturnsPage() {
             setSearchResults([]);
             setIsSearchOpen(false);
         }
-    }, [searchTerm]);
+    }, [searchTerm, allProducts]);
 
     const handleSelectSearchItem = (item: Product) => {
         setSearchTerm(item.name);
@@ -92,7 +101,7 @@ export default function ReturnsPage() {
         
         const item = allProducts.find(p => p.name.toLowerCase() === searchTerm.toLowerCase() || p.code.toLowerCase() === searchTerm.toLowerCase());
 
-        if (!item) {
+        if (!item || !item.id) {
              toast({
                 title: "Item não encontrado",
                 description: "O item buscado não existe no inventário.",
@@ -126,7 +135,7 @@ export default function ReturnsPage() {
         setReturnedItems(prev => prev.filter(item => item.id !== itemId));
     };
 
-    const handleFinalizeReturn = () => {
+    const handleFinalizeReturn = async () => {
         if (returnedItems.length === 0) {
             toast({
                 title: "Nenhum item adicionado",
@@ -145,19 +154,24 @@ export default function ReturnsPage() {
             return;
         }
 
-        returnedItems.forEach(item => {
-            const productIndex = allProducts.findIndex(p => p.id === item.id);
-            if (productIndex !== -1) {
-                allProducts[productIndex].quantity += item.quantity;
+        for (const item of returnedItems) {
+            const product = allProducts.find(p => p.id === item.id);
+            if (product && product.id) {
+                 const newQuantity = product.quantity + item.quantity;
+                 await updateProduct(product.id, { quantity: newQuantity });
             }
-            addMovement({
+            const movement: Omit<Movement, 'id'> = {
                 productId: item.id,
                 date: new Date().toISOString(),
                 type: 'Devolução',
                 quantity: item.quantity,
-                responsible: 'sdpinho29' 
-            });
-        });
+                responsible: 'sdpinho29' // Mock responsible
+            };
+            await addMovement(movement);
+        }
+
+        const updatedProducts = await getProducts();
+        setAllProducts(updatedProducts);
 
         toast({
             title: "Devolução Registrada!",
@@ -239,7 +253,7 @@ export default function ReturnsPage() {
                                                         onClick={() => handleSelectSearchItem(item)}
                                                     >
                                                         <Image 
-                                                            src={item.image}
+                                                            src={item.image || "https://placehold.co/40x40.png"}
                                                             alt={item.name}
                                                             width={40}
                                                             height={40}

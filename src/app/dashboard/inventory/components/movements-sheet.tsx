@@ -1,10 +1,11 @@
+
 "use client";
 
 import * as React from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
-import { movements as allMovements } from "@/lib/mock-data";
+import { Movement, getMovementsForItem } from "@/lib/firestore";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -46,11 +47,15 @@ interface MovementsSheetProps {
 }
 
 export function MovementsSheet({ isOpen, onOpenChange, item }: MovementsSheetProps) {
-  const [itemMovements, setItemMovements] = React.useState<any[]>([]);
+  const [itemMovements, setItemMovements] = React.useState<Movement[]>([]);
 
   React.useEffect(() => {
-    if (isOpen && item) {
-      setItemMovements(allMovements.filter(m => m.productId === item.id));
+    if (isOpen && item && item.id) {
+      const fetchMovements = async () => {
+        const movements = await getMovementsForItem(item.id);
+        setItemMovements(movements);
+      };
+      fetchMovements();
     }
   }, [isOpen, item]);
 

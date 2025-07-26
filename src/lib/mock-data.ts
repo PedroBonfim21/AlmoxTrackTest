@@ -1,3 +1,4 @@
+
 export const products = [
     {
       id: "1",
@@ -142,10 +143,9 @@ export const products = [
 
   ];
   
-  export const addMovement = (movement: Omit<Movement, 'id'>) => {
-      movements.push({
-          id: (movements.length + 1).toString(),
-          ...movement,
-      });
-  };
-  
+// This function will no longer be used directly in the app, but is kept for reference
+// or potential future use. The app will use the Firestore `addMovement` function.
+export const addMovement = (movement: Omit<Movement, 'id'>) => {
+    // This is now a mock function and does not affect the Firestore database.
+    console.log("Mock addMovement called. In a real app, this would be a Firestore call.");
+};
