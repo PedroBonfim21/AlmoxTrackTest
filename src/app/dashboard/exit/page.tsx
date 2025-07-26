@@ -11,7 +11,6 @@ import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -37,8 +36,6 @@ import {
     AlertDialogAction,
     AlertDialogCancel,
     AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
@@ -46,9 +43,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { products as mockProducts, addMovement as mockAddMovement } from "@/lib/mock-data";
-
-type Product = typeof mockProducts[0];
+import type { Product } from "@/lib/firestore";
+import { getProducts, updateProduct, addMovement } from "@/lib/firestore";
 
 type RequestedItem = {
     id: string;
@@ -60,7 +56,7 @@ type RequestedItem = {
 
 export default function ExitPage() {
     const { toast } = useToast();
-    const [allProducts, setAllProducts] = React.useState<Product[]>(mockProducts);
+    const [allProducts, setAllProducts] = React.useState<Product[]>([]);
     const [activeTab, setActiveTab] = React.useState("consumption");
 
     // State for Consumption Tab
@@ -88,6 +84,17 @@ export default function ExitPage() {
     const [responsibilityItems, setResponsibilityItems] = React.useState<RequestedItem[]>([]);
     const [isConfirmDialogOpen, setIsConfirmDialogOpen] = React.useState(false);
     const [isTermAccepted, setIsTermAccepted] = React.useState(false);
+    const [isLoading, setIsLoading] = React.useState(true);
+    
+    React.useEffect(() => {
+        const fetchProducts = async () => {
+            setIsLoading(true);
+            const productsFromDb = await getProducts();
+            setAllProducts(productsFromDb);
+            setIsLoading(false);
+        };
+        fetchProducts();
+    }, []);
 
     const consumableItems = allProducts.filter(p => p.type === 'consumo');
     const permanentItems = allProducts.filter(p => p.type === 'permanente');
@@ -189,8 +196,39 @@ export default function ExitPage() {
         const setRequestedItemsFn = type === 'consumption' ? setRequestedItems : setResponsibilityItems;
         setRequestedItemsFn(prev => prev.filter(item => item.id !== itemId));
     };
+    
+    const finalizeItems = async (itemsToProcess: {id: string, quantity: number}[], responsible: string, dept: string) => {
+        try {
+            for (const item of itemsToProcess) {
+                const product = allProducts.find(p => p.id === item.id);
+                if (product) {
+                    const newQuantity = product.quantity - item.quantity;
+                    await updateProduct(item.id, { quantity: newQuantity });
+                    await addMovement({
+                        productId: item.id,
+                        date: new Date().toISOString(),
+                        type: 'Saída',
+                        quantity: item.quantity,
+                        responsible: responsible,
+                        department: dept
+                    });
+                }
+            }
+             // Refetch products to get updated quantities
+            const updatedProducts = await getProducts();
+            setAllProducts(updatedProducts);
+            return true;
+        } catch (error) {
+             toast({
+                title: "Erro ao Finalizar Saída",
+                description: "Não foi possível registrar a saída. Tente novamente.",
+                variant: "destructive"
+            });
+            return false;
+        }
+    }
 
-    const handleFinalizeIssue = () => {
+    const handleFinalizeIssue = async () => {
         if (requestedItems.length === 0) {
             toast({ title: "Nenhum item solicitado", description: "Adicione pelo menos um item para registrar a saída.", variant: "destructive" });
             return;
@@ -201,34 +239,18 @@ export default function ExitPage() {
             return;
         }
         
-        setAllProducts(prevProducts => {
-            const newProducts = [...prevProducts];
-            requestedItems.forEach(item => {
-                const productIndex = newProducts.findIndex(p => p.id === item.id);
-                if (productIndex !== -1) {
-                    newProducts[productIndex].quantity -= item.quantity;
-                }
-                mockAddMovement({
-                    productId: item.id,
-                    date: new Date().toISOString(),
-                    type: 'Saída',
-                    quantity: item.quantity,
-                    responsible: requesterName,
-                    department: department,
-                });
-            });
-            return newProducts;
-        });
-        
-        toast({ title: "Saída Registrada!", description: "A saída de materiais de consumo foi registrada com sucesso." });
+        const success = await finalizeItems(requestedItems, requesterName, department);
 
-        // Reset form
-        setRequestDate(new Date());
-        setRequesterName("");
-        setRequesterId("");
-        setDepartment("");
-        setPurpose("");
-        setRequestedItems([]);
+        if (success) {
+            toast({ title: "Saída Registrada!", description: "A saída de materiais de consumo foi registrada com sucesso." });
+            // Reset form
+            setRequestDate(new Date());
+            setRequesterName("");
+            setRequesterId("");
+            setDepartment("");
+            setPurpose("");
+            setRequestedItems([]);
+        }
     };
     
     const handleFinalizeResponsibility = () => {
@@ -244,43 +266,36 @@ export default function ExitPage() {
         setIsConfirmDialogOpen(true);
     };
 
-    const handlePrintAndFinalize = (e: React.MouseEvent<HTMLButtonElement>) => {
+    const handlePrintAndFinalize = async (e: React.MouseEvent<HTMLButtonElement>) => {
         e.preventDefault();
         
-        setAllProducts(prevProducts => {
-            const newProducts = [...prevProducts];
-            responsibilityItems.forEach(item => {
-                const productIndex = newProducts.findIndex(p => p.id === item.id);
-                if (productIndex !== -1) {
-                    newProducts[productIndex].quantity -= item.quantity;
-                }
-                mockAddMovement({
-                    productId: item.id,
-                    date: new Date().toISOString(),
-                    type: 'Saída',
-                    quantity: item.quantity,
-                    responsible: responsibleName,
-                    department: responsibilityDepartment
-                });
-            });
-            return newProducts;
-        });
-
-        toast({ title: "Termo Gerado e Saída Registrada!", description: "A saída de material permanente foi registrada com sucesso." });
+        const success = await finalizeItems(responsibilityItems, responsibleName, responsibilityDepartment);
         
-        setTimeout(() => {
-            window.print();
+        if (success) {
+            toast({ title: "Termo Gerado e Saída Registrada!", description: "A saída de material permanente foi registrada com sucesso." });
             
-            // Reset form after printing
-            setIsConfirmDialogOpen(false);
-            setResponsibilityDate(new Date());
-            setResponsibleName("");
-            setResponsibleId("");
-            setResponsibilityDepartment("");
-            setProjectDescription("");
-            setResponsibilityItems([]);
-        }, 100);
+            setTimeout(() => {
+                window.print();
+                
+                // Reset form after printing
+                setIsConfirmDialogOpen(false);
+                setResponsibilityDate(new Date());
+                setResponsibleName("");
+                setResponsibleId("");
+                setResponsibilityDepartment("");
+                setProjectDescription("");
+                setResponsibilityItems([]);
+            }, 100);
+        }
     };
+
+     if (isLoading) {
+        return (
+            <div className="flex justify-center items-center h-full">
+                <p>Carregando dados...</p>
+            </div>
+        )
+    }
 
     return (
         <div className="flex flex-col gap-6">
@@ -647,5 +662,3 @@ export default function ExitPage() {
         </div>
     );
 }
-
-    

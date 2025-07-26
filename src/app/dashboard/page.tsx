@@ -14,17 +14,17 @@ import {
   LineChart,
   Line,
 } from "recharts";
-import { format, subDays, parseISO } from "date-fns";
+import { format, subDays, parseISO, isValid } from "date-fns";
 import { DateRange } from "react-day-picker";
 import { ptBR } from "date-fns/locale";
 import {
   ArrowDown,
   ArrowUp,
   FileDown,
-  FileText,
-  MoveRight,
   Package,
   Warehouse,
+  Calendar as CalendarIcon,
+  MoveRight,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -48,13 +48,16 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { products, movements as allMovements } from "@/lib/mock-data";
+import type { Product, Movement } from "@/lib/firestore";
+import { getProducts, getMovements } from "@/lib/firestore";
 import { cn } from "@/lib/utils";
 
-type Movement = typeof allMovements[0];
-type Product = typeof products[0];
 
 export default function DashboardPage() {
+  const [products, setProducts] = React.useState<Product[]>([]);
+  const [allMovements, setAllMovements] = React.useState<Movement[]>([]);
+  const [filteredMovements, setFilteredMovements] = React.useState<Movement[]>([]);
+  
   const [date, setDate] = React.useState<DateRange | undefined>({
     from: subDays(new Date(), 29),
     to: new Date(),
@@ -62,18 +65,30 @@ export default function DashboardPage() {
   const [movementType, setMovementType] = React.useState("all");
   const [materialType, setMaterialType] = React.useState("all");
   const [department, setDepartment] = React.useState("all");
-  const [filteredMovements, setFilteredMovements] =
-    React.useState<Movement[]>(allMovements);
+  const [isLoading, setIsLoading] = React.useState(true);
 
-  const handleApplyFilters = () => {
+  React.useEffect(() => {
+    const fetchData = async () => {
+        setIsLoading(true);
+        const [productsData, movementsData] = await Promise.all([getProducts(), getMovements()]);
+        setProducts(productsData);
+        setAllMovements(movementsData);
+        setFilteredMovements(movementsData);
+        setIsLoading(false);
+    };
+    fetchData();
+  }, []);
+  
+  const handleApplyFilters = React.useCallback(() => {
     let newFilteredMovements = allMovements;
 
     // Filter by date
     if (date?.from && date?.to) {
-      newFilteredMovements = newFilteredMovements.filter((m) => {
-        const movementDate = parseISO(m.date);
-        return movementDate >= date.from! && movementDate <= date.to!;
-      });
+        newFilteredMovements = newFilteredMovements.filter(m => {
+            const movementDate = parseISO(m.date);
+            if (!isValid(movementDate)) return false;
+            return movementDate >= date.from! && movementDate <= date.to!;
+        });
     }
 
     // Filter by movement type
@@ -101,17 +116,16 @@ export default function DashboardPage() {
     }
 
     setFilteredMovements(newFilteredMovements);
-  };
+  }, [allMovements, date, movementType, materialType, department, products]);
 
   // Run on mount and when filters change
   React.useEffect(() => {
     handleApplyFilters();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [date, movementType, materialType, department]);
+  }, [handleApplyFilters]);
 
-  const uniqueDepartments = [
-    ...new Set(allMovements.map((m) => m.department).filter(Boolean)),
-  ];
+  const uniqueDepartments = React.useMemo(() => 
+    [...new Set(allMovements.map((m) => m.department).filter(Boolean as any))]
+  , [allMovements]);
 
   const totalMovements = filteredMovements.length;
   const totalEntries = filteredMovements.filter(
@@ -122,7 +136,7 @@ export default function DashboardPage() {
   ).length;
 
   const mostMovedItem = React.useMemo(() => {
-    if (filteredMovements.length === 0) return { name: "N/A", count: 0 };
+    if (filteredMovements.length === 0 || products.length === 0) return { name: "N/A", count: 0 };
     const counts = filteredMovements.reduce((acc, mov) => {
       acc[mov.productId] = (acc[mov.productId] || 0) + 1;
       return acc;
@@ -134,7 +148,7 @@ export default function DashboardPage() {
     );
     const product = products.find((p) => p.id === mostMovedId);
     return { name: product?.name || "Desconhecido", count: counts[mostMovedId] };
-  }, [filteredMovements]);
+  }, [filteredMovements, products]);
 
   const topSector = React.useMemo(() => {
     if (filteredMovements.length === 0) return { name: "N/A", count: 0 };
@@ -170,7 +184,7 @@ export default function DashboardPage() {
   }, [filteredMovements]);
 
   const top10Items = React.useMemo(() => {
-    if (filteredMovements.length === 0) return [];
+    if (filteredMovements.length === 0 || products.length === 0) return [];
     const counts = filteredMovements.reduce((acc, mov) => {
       acc[mov.productId] = (acc[mov.productId] || 0) + mov.quantity;
       return acc;
@@ -183,7 +197,7 @@ export default function DashboardPage() {
         const product = products.find((p) => p.id === productId);
         return { name: product?.name || "Desconhecido", total };
       });
-  }, [filteredMovements]);
+  }, [filteredMovements, products]);
   
   const handleExport = () => {
         const headers = ["Data", "Tipo", "Produto", "Quantidade", "Responsável", "Departamento"];
@@ -209,6 +223,10 @@ export default function DashboardPage() {
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+    }
+
+    if (isLoading) {
+        return <div className="flex justify-center items-center h-full"><p>Carregando dashboard...</p></div>
     }
 
   return (
@@ -242,7 +260,7 @@ export default function DashboardPage() {
                     !date && "text-muted-foreground"
                   )}
                 >
-                  <MoveRight className="mr-2 h-4 w-4" />
+                  <CalendarIcon className="mr-2 h-4 w-4" />
                   {date?.from ? (
                     date.to ? (
                       <>
@@ -449,4 +467,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-    

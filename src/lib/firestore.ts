@@ -1,6 +1,6 @@
 
 import { db } from './firebase';
-import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, query, where, writeBatch } from 'firebase/firestore';
+import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, query, where, writeBatch, runTransaction, getDoc, increment } from 'firebase/firestore';
 
 // Product Type
 export type Product = {
@@ -45,6 +45,34 @@ export const updateProduct = async (productId: string, productData: Partial<Prod
     await updateDoc(productDoc, productData);
 };
 
+export const updateProductQuantityOnEntry = async (productId: string, quantity: number): Promise<void> => {
+    const productRef = doc(db, "products", productId);
+    try {
+        await runTransaction(db, async (transaction) => {
+            const productDoc = await transaction.get(productRef);
+            if (!productDoc.exists()) {
+                throw "Document does not exist!";
+            }
+            
+            const newQuantity = (productDoc.data().quantity || 0) + quantity;
+            transaction.update(productRef, { quantity: newQuantity });
+
+            const movementData: Omit<Movement, 'id'> = {
+                productId: productId,
+                date: new Date().toISOString(),
+                type: 'Entrada',
+                quantity: quantity,
+                responsible: 'Sistema'
+            };
+            const movementRef = doc(collection(db, "movements"));
+            transaction.set(movementRef, movementData);
+        });
+    } catch (e) {
+        console.error("Transaction failed: ", e);
+    }
+}
+
+
 export const deleteProduct = async (productId: string): Promise<void> => {
     const productDoc = doc(db, 'products', productId);
     await deleteDoc(productDoc);
@@ -86,5 +114,3 @@ export const seedDatabase = async (products: Omit<Product, 'id'>[], movements: O
     await batch.commit();
     console.log('Database seeded successfully!');
 }
-
-    

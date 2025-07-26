@@ -43,12 +43,11 @@ import { AddItemSheet } from "./components/add-item-sheet";
 import { EditItemSheet } from "./components/edit-item-sheet";
 import { MovementsSheet } from "./components/movements-sheet";
 import { useToast } from "@/hooks/use-toast";
-import { products as initialProducts, movements as allMovements, addMovement } from "@/lib/mock-data";
-
-type Product = typeof initialProducts[0];
+import type { Product } from "@/lib/firestore";
+import { getProducts, addProduct, updateProduct, deleteProduct, updateProductQuantityOnEntry, addMovement } from "@/lib/firestore";
 
 export default function InventoryPage() {
-  const [products, setProducts] = React.useState<Product[]>(initialProducts);
+  const [products, setProducts] = React.useState<Product[]>([]);
   const [searchTerm, setSearchTerm] = React.useState("");
   const [isAddSheetOpen, setIsAddSheetOpen] = React.useState(false);
   const [isEditSheetOpen, setIsEditSheetOpen] = React.useState(false);
@@ -56,26 +55,37 @@ export default function InventoryPage() {
   const [selectedItem, setSelectedItem] = React.useState<Product | null>(null);
   const [itemToDelete, setItemToDelete] = React.useState<Product | null>(null);
   const { toast } = useToast();
+  const [isLoading, setIsLoading] = React.useState(true);
 
-  const handleAddItem = React.useCallback((newItemData: any) => {
+  const fetchProducts = React.useCallback(async () => {
+    setIsLoading(true);
+    const productsFromDb = await getProducts();
+    setProducts(productsFromDb);
+    setIsLoading(false);
+  }, []);
+
+  React.useEffect(() => {
+    fetchProducts();
+  }, [fetchProducts]);
+
+  const handleAddItem = React.useCallback(async (newItemData: any) => {
     const itemCode = newItemData.itemCode?.trim();
     
     // Check if an item with the same code already exists
     if (itemCode) {
       const existingProduct = products.find(p => p.code === itemCode);
       if (existingProduct) {
-          const updatedQuantity = existingProduct.quantity + newItemData.initialQuantity;
-          setProducts(prevProducts => prevProducts.map(p => p.id === existingProduct.id ? {...p, quantity: updatedQuantity} : p));
+          await updateProductQuantityOnEntry(existingProduct.id, newItemData.initialQuantity);
           toast({
               title: "Estoque Atualizado!",
               description: `A quantidade de ${existingProduct.name} foi atualizada.`,
           });
+          fetchProducts(); // Refetch to update UI
           return;
       }
     }
     
-    const newProduct: Product = {
-      id: (products.length + 1).toString(),
+    const newProduct: Omit<Product, 'id'> = {
       name: newItemData.name,
       code: itemCode || `00${products.length + 1}-25`,
       patrimony: newItemData.materialType === 'permanente' ? newItemData.patrimony : 'N/A',
@@ -86,40 +96,50 @@ export default function InventoryPage() {
       image: "https://placehold.co/40x40.png"
     };
 
-    setProducts(prevProducts => [...prevProducts, newProduct]);
+    const newProductId = await addProduct(newProduct);
+    if(newItemData.initialQuantity > 0) {
+        await addMovement({
+            productId: newProductId,
+            date: new Date().toISOString(),
+            type: 'Entrada',
+            quantity: newItemData.initialQuantity,
+            responsible: 'Sistema'
+        });
+    }
 
-  }, [products, toast]);
+    fetchProducts(); // Refetch to update UI
+  }, [products, toast, fetchProducts]);
   
-  const handleUpdateItem = (updatedItemData: any) => {
+  const handleUpdateItem = async (updatedItemData: any) => {
     if (!selectedItem) return;
 
-    setProducts(prevProducts =>
-        prevProducts.map(p => 
-            p.id === selectedItem.id ? {
-                ...p,
-                name: updatedItemData.name,
-                type: updatedItemData.materialType,
-                code: updatedItemData.itemCode,
-                patrimony: updatedItemData.materialType === 'permanente' ? updatedItemData.patrimony : 'N/A',
-                unit: updatedItemData.unit,
-                quantity: updatedItemData.quantity,
-                category: updatedItemData.category,
-            } : p
-        )
-    );
-     toast({
+    const updateData: Partial<Product> = {
+        name: updatedItemData.name,
+        type: updatedItemData.materialType,
+        code: updatedItemData.itemCode,
+        patrimony: updatedItemData.materialType === 'permanente' ? updatedItemData.patrimony : 'N/A',
+        unit: updatedItemData.unit,
+        quantity: updatedItemData.quantity,
+        category: updatedItemData.category,
+    };
+    
+    await updateProduct(selectedItem.id, updateData);
+    
+    toast({
       title: "Item Atualizado!",
       description: `${updatedItemData.name} foi atualizado com sucesso.`,
     });
+    fetchProducts();
   };
   
-  const handleDeleteItem = (productId: string) => {
-    setProducts(prevProducts => prevProducts.filter(p => p.id !== productId));
+  const handleDeleteItem = async (productId: string) => {
+    await deleteProduct(productId);
     setItemToDelete(null);
     toast({
         title: "Item Excluído!",
         description: "O item foi removido do inventário.",
     });
+    fetchProducts();
   };
 
 
@@ -181,64 +201,74 @@ export default function InventoryPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredProducts.map((product) => (
-                    <TableRow key={product.id}>
-                      <TableCell>
-                        <Image
-                          src={product.image || "https://placehold.co/40x40.png"}
-                          alt={product.name}
-                          width={40}
-                          height={40}
-                          className="rounded-md object-cover aspect-square"
-                          data-ai-hint="product image"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <div className="font-medium">{product.name}</div>
-                        <div className="text-sm text-muted-foreground">
-                          Código: {product.code}
-                        </div>
-                         <div className="text-sm text-muted-foreground md:hidden">
-                          Patrimônio: {product.patrimony}
-                        </div>
-                      </TableCell>
-                      <TableCell className="hidden md:table-cell">
-                        <Badge variant={product.type === 'permanente' ? 'secondary' : 'outline'}>
-                          {product.type}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="hidden lg:table-cell">{product.category}</TableCell>
-                      <TableCell className="text-right">
-                        <div className="font-medium">{product.quantity}</div>
-                        <div className="text-sm text-muted-foreground">{product.unit}</div>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button aria-haspopup="true" size="icon" variant="ghost">
-                              <MoreHorizontal className="h-4 w-4" />
-                              <span className="sr-only">Toggle menu</span>
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleMovementsClick(product)}>
-                              <History className="mr-2 h-4 w-4" />
-                              <span>Ver Movimentações</span>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleEditClick(product)}>
-                              <Edit className="mr-2 h-4 w-4" />
-                              <span>Editar Item</span>
-                            </DropdownMenuItem>
-                             <DropdownMenuSeparator />
-                            <DropdownMenuItem className="text-red-600" onClick={() => setItemToDelete(product)}>
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              <span>Excluir</span>
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
+                  {isLoading ? (
+                     <TableRow>
+                      <TableCell colSpan={6} className="text-center text-muted-foreground">Carregando inventário...</TableCell>
                     </TableRow>
-                  ))}
+                  ) : filteredProducts.length > 0 ? (
+                    filteredProducts.map((product) => (
+                      <TableRow key={product.id}>
+                        <TableCell>
+                          <Image
+                            src={product.image || "https://placehold.co/40x40.png"}
+                            alt={product.name}
+                            width={40}
+                            height={40}
+                            className="rounded-md object-cover aspect-square"
+                            data-ai-hint="product image"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <div className="font-medium">{product.name}</div>
+                          <div className="text-sm text-muted-foreground">
+                            Código: {product.code}
+                          </div>
+                           <div className="text-sm text-muted-foreground md:hidden">
+                            Patrimônio: {product.patrimony}
+                          </div>
+                        </TableCell>
+                        <TableCell className="hidden md:table-cell">
+                          <Badge variant={product.type === 'permanente' ? 'secondary' : 'outline'}>
+                            {product.type}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="hidden lg:table-cell">{product.category}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="font-medium">{product.quantity}</div>
+                          <div className="text-sm text-muted-foreground">{product.unit}</div>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button aria-haspopup="true" size="icon" variant="ghost">
+                                <MoreHorizontal className="h-4 w-4" />
+                                <span className="sr-only">Toggle menu</span>
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => handleMovementsClick(product)}>
+                                <History className="mr-2 h-4 w-4" />
+                                <span>Ver Movimentações</span>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleEditClick(product)}>
+                                <Edit className="mr-2 h-4 w-4" />
+                                <span>Editar Item</span>
+                              </DropdownMenuItem>
+                               <DropdownMenuSeparator />
+                              <DropdownMenuItem className="text-red-600" onClick={() => setItemToDelete(product)}>
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                <span>Excluir</span>
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                        <TableCell colSpan={6} className="text-center text-muted-foreground">Nenhum produto encontrado.</TableCell>
+                    </TableRow>
+                  )}
                 </TableBody>
               </Table>
             </div>
@@ -291,5 +321,3 @@ export default function InventoryPage() {
     </>
   );
 }
-
-    

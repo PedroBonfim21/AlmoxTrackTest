@@ -5,19 +5,15 @@ import Link from "next/link";
 import * as React from "react";
 import {
   CircleUser,
-  FileText,
   LayoutDashboard,
   LogOut,
   Package,
   ArrowRightToLine,
   ArrowLeftFromLine,
-  Users,
-  Warehouse,
   Settings,
-  History,
-  Replace,
   ChevronsLeftRight,
-  FileCog
+  FileCog,
+  Warehouse
 } from "lucide-react";
 import {
   SidebarProvider,
@@ -41,11 +37,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { AdminSyncAuthDialog } from "./components/admin-sync-auth-dialog";
 import { usePathname } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
-import { products } from "@/lib/mock-data";
 import { syncToSheet } from "@/ai/flows/sync-sheet-flow";
 
 // Mock user role - 'Admin' or 'Operator'
@@ -77,7 +72,6 @@ export default function DashboardLayout({
     try {
         const result = await syncToSheet({
             accessToken: credential.accessToken,
-            products,
         });
         toast({
             title: "Sync Complete!",

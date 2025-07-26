@@ -11,7 +11,6 @@ import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -39,9 +38,9 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { products as mockProducts, addMovement as mockAddMovement } from "@/lib/mock-data";
+import type { Product } from "@/lib/firestore";
+import { getProducts, updateProduct, addMovement } from "@/lib/firestore";
 
-type Product = typeof mockProducts[0];
 
 type ReturnedItem = {
     id: string;
@@ -52,7 +51,7 @@ type ReturnedItem = {
 
 export default function ReturnsPage() {
     const { toast } = useToast();
-    const [allProducts, setAllProducts] = React.useState<Product[]>(mockProducts);
+    const [allProducts, setAllProducts] = React.useState<Product[]>([]);
     const [returnDate, setReturnDate] = React.useState<Date | undefined>(new Date());
     const [returningDepartment, setReturningDepartment] = React.useState("");
     const [returnReason, setReturnReason] = React.useState("");
@@ -61,6 +60,18 @@ export default function ReturnsPage() {
     const [returnedItems, setReturnedItems] = React.useState<ReturnedItem[]>([]);
     const [searchResults, setSearchResults] = React.useState<Product[]>([]);
     const [isSearchOpen, setIsSearchOpen] = React.useState(false);
+    const [isLoading, setIsLoading] = React.useState(true);
+
+    const fetchProducts = React.useCallback(async () => {
+        setIsLoading(true);
+        const productsFromDb = await getProducts();
+        setAllProducts(productsFromDb);
+        setIsLoading(false);
+    }, []);
+
+    React.useEffect(() => {
+        fetchProducts();
+    }, [fetchProducts]);
 
     React.useEffect(() => {
         if (searchTerm.trim()) {
@@ -120,7 +131,7 @@ export default function ReturnsPage() {
         setReturnedItems(prev => prev.filter(item => item.id !== itemId));
     };
 
-    const handleFinalizeReturn = () => {
+    const handleFinalizeReturn = async () => {
         if (returnedItems.length === 0) {
             toast({
                 title: "Nenhum item adicionado",
@@ -139,35 +150,50 @@ export default function ReturnsPage() {
             return;
         }
 
-        setAllProducts(prevProducts => {
-            const newProducts = [...prevProducts];
-            returnedItems.forEach(item => {
-                const productIndex = newProducts.findIndex(p => p.id === item.id);
-                if (productIndex !== -1) {
-                    newProducts[productIndex].quantity += item.quantity;
+        try {
+            for (const item of returnedItems) {
+                const product = allProducts.find(p => p.id === item.id);
+                if (product) {
+                    const newQuantity = product.quantity + item.quantity;
+                    await updateProduct(item.id, { quantity: newQuantity });
+                    await addMovement({
+                        productId: item.id,
+                        date: new Date().toISOString(),
+                        type: 'Devolução',
+                        quantity: item.quantity,
+                        responsible: 'sdpinho29' // Mock responsible
+                    });
                 }
-                mockAddMovement({
-                    productId: item.id,
-                    date: new Date().toISOString(),
-                    type: 'Devolução',
-                    quantity: item.quantity,
-                    responsible: 'sdpinho29' // Mock responsible
-                });
+            }
+
+            fetchProducts();
+
+            toast({
+                title: "Devolução Registrada!",
+                description: "A devolução de materiais foi registrada com sucesso.",
             });
-            return newProducts;
-        });
 
-        toast({
-            title: "Devolução Registrada!",
-            description: "A devolução de materiais foi registrada com sucesso.",
-        });
-
-        // Reset form
-        setReturnDate(new Date());
-        setReturningDepartment("");
-        setReturnReason("");
-        setReturnedItems([]);
+            // Reset form
+            setReturnDate(new Date());
+            setReturningDepartment("");
+            setReturnReason("");
+            setReturnedItems([]);
+        } catch (error) {
+            toast({
+                title: "Erro ao Finalizar Devolução",
+                description: "Não foi possível registrar a devolução. Tente novamente.",
+                variant: "destructive"
+            });
+        }
     };
+
+    if (isLoading) {
+        return (
+            <div className="flex justify-center items-center h-full">
+                <p>Carregando dados...</p>
+            </div>
+        )
+    }
 
     return (
         <div className="flex flex-col gap-6">
@@ -310,5 +336,3 @@ export default function ReturnsPage() {
         </div>
     );
 }
-
-    

@@ -11,10 +11,11 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 import { google } from 'googleapis';
+import { getProducts } from '@/lib/firestore';
 
 const ProductSchema = z.object({
     id: z.string(),
-    image: z.string(),
+    image: z.string().optional(),
     name: z.string(),
     code: z.string(),
     patrimony: z.string(),
@@ -26,7 +27,6 @@ const ProductSchema = z.object({
 
 const SyncToSheetInputSchema = z.object({
   accessToken: z.string().describe("OAuth access token for Google API."),
-  products: z.array(ProductSchema).describe("An array of products to sync."),
 });
 export type SyncToSheetInput = z.infer<typeof SyncToSheetInputSchema>;
 
@@ -46,11 +46,14 @@ const syncToSheetFlow = ai.defineFlow(
     inputSchema: SyncToSheetInputSchema,
     outputSchema: SyncToSheetOutputSchema,
   },
-  async ({ accessToken, products }) => {
+  async ({ accessToken }) => {
     const oauth2Client = new google.auth.OAuth2();
     oauth2Client.setCredentials({ access_token: accessToken });
 
     const sheets = google.sheets({ version: 'v4', auth: oauth2Client });
+    
+    // Fetch products from Firestore
+    const products = await getProducts();
 
     // 1. Create a new spreadsheet
     const spreadsheet = await sheets.spreadsheets.create({
@@ -71,7 +74,7 @@ const syncToSheetFlow = ai.defineFlow(
       'ID', 'Name', 'Code', 'Patrimony', 'Type', 'Quantity', 'Unit', 'Category', 'Image URL'
     ];
     const rows = products.map(p => [
-      p.id, p.name, p.code, p.patrimony, p.type, p.quantity, p.unit, p.category, p.image
+      p.id, p.name, p.code, p.patrimony, p.type, p.quantity, p.unit, p.category, p.image || ''
     ]);
 
     const values = [headerRow, ...rows];

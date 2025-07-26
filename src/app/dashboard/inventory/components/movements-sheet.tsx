@@ -5,7 +5,8 @@ import * as React from "react";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
-import { movements as allMovements } from "@/lib/mock-data";
+import type { Movement } from "@/lib/firestore";
+import { getMovementsForItem } from "@/lib/firestore";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -26,8 +27,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-
-type Movement = typeof allMovements[0];
 
 const getBadgeVariant = (type: string) => {
     switch (type) {
@@ -50,11 +49,17 @@ interface MovementsSheetProps {
 
 export function MovementsSheet({ isOpen, onOpenChange, item }: MovementsSheetProps) {
   const [itemMovements, setItemMovements] = React.useState<Movement[]>([]);
+  const [isLoading, setIsLoading] = React.useState(false);
 
   React.useEffect(() => {
     if (isOpen && item) {
-      const movements = allMovements.filter(m => m.productId === item.id);
-      setItemMovements(movements);
+      const fetchMovements = async () => {
+        setIsLoading(true);
+        const movements = await getMovementsForItem(item.id);
+        setItemMovements(movements);
+        setIsLoading(false);
+      };
+      fetchMovements();
     }
   }, [isOpen, item]);
 
@@ -79,7 +84,11 @@ export function MovementsSheet({ isOpen, onOpenChange, item }: MovementsSheetPro
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {itemMovements.length > 0 ? (
+                  {isLoading ? (
+                     <TableRow>
+                      <TableCell colSpan={4} className="text-center text-muted-foreground">Carregando...</TableCell>
+                    </TableRow>
+                  ) : itemMovements.length > 0 ? (
                     itemMovements.map((movement) => (
                       <TableRow key={movement.id}>
                         <TableCell>{format(parseISO(movement.date), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</TableCell>
@@ -112,5 +121,3 @@ export function MovementsSheet({ isOpen, onOpenChange, item }: MovementsSheetPro
     </Sheet>
   );
 }
-
-    

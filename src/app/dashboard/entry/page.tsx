@@ -5,14 +5,12 @@ import * as React from "react";
 import { PlusCircle, Search, Calendar as CalendarIcon, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { DateRange } from "react-day-picker";
 import Image from "next/image";
 
 import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -31,24 +29,12 @@ import {
     PopoverTrigger,
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
 import { AddItemSheet } from "../inventory/components/add-item-sheet";
 import { AdminAuthDialog } from "./components/admin-auth-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { products as mockProducts, movements as mockMovements, addMovement as mockAddMovement } from "@/lib/mock-data";
-
-type Product = typeof mockProducts[0];
-type Movement = typeof mockMovements[0];
+import type { Product } from "@/lib/firestore";
+import { getProducts, addProduct, addMovement, updateProduct } from "@/lib/firestore";
 
 type ReceivedItem = {
     id: string;
@@ -62,7 +48,7 @@ const currentUserRole = "Operator";
 
 export default function EntryPage() {
     const { toast } = useToast();
-    const [allProducts, setAllProducts] = React.useState<Product[]>(mockProducts);
+    const [allProducts, setAllProducts] = React.useState<Product[]>([]);
     const [entryDate, setEntryDate] = React.useState<Date | undefined>(new Date());
     const [supplier, setSupplier] = React.useState("");
     const [invoice, setInvoice] = React.useState("");
@@ -75,6 +61,17 @@ export default function EntryPage() {
     
     const [isAddItemSheetOpen, setIsAddItemSheetOpen] = React.useState(false);
     const [isAuthDialogOpen, setIsAuthDialogOpen] = React.useState(false);
+    const [isLoading, setIsLoading] = React.useState(true);
+
+    React.useEffect(() => {
+        const fetchProducts = async () => {
+            setIsLoading(true);
+            const productsFromDb = await getProducts();
+            setAllProducts(productsFromDb);
+            setIsLoading(false);
+        };
+        fetchProducts();
+    }, []);
 
     React.useEffect(() => {
        if (searchTerm.trim()) {
@@ -136,11 +133,10 @@ export default function EntryPage() {
         setReceivedItems(prev => prev.filter(item => item.id !== itemId));
     };
 
-    const handleItemAdded = (newItemData: any) => {
-        const newProduct: Product = {
-            id: (allProducts.length + 1).toString(),
+    const handleItemAdded = async (newItemData: any) => {
+        const newProductData: Omit<Product, 'id'> = {
             name: newItemData.name,
-            code: newItemData.itemCode || `new-${allProducts.length + 1}`,
+            code: newItemData.itemCode || `new-${Date.now()}`,
             unit: newItemData.unit,
             patrimony: newItemData.materialType === 'permanente' ? newItemData.patrimony : 'N/A',
             type: newItemData.materialType,
@@ -148,16 +144,18 @@ export default function EntryPage() {
             category: newItemData.category,
             image: "https://placehold.co/40x40.png"
         };
-
-        setAllProducts(prev => [...prev, newProduct]);
+        
+        const newProductId = await addProduct(newProductData);
+        const newProductWithId = { ...newProductData, id: newProductId };
+        setAllProducts(prev => [...prev, newProductWithId]);
         
         toast({
             title: "Item Adicionado!",
-            description: `${newProduct.name} foi adicionado ao inventário.`,
+            description: `${newProductData.name} foi adicionado ao inventário.`,
         });
         
         if (newItemData.initialQuantity > 0) {
-            setReceivedItems(prev => [...prev, { id: newProduct.id, name: newProduct.name, quantity: newItemData.initialQuantity, unit: newProduct.unit }]);
+            setReceivedItems(prev => [...prev, { id: newProductWithId.id, name: newProductWithId.name, quantity: newItemData.initialQuantity, unit: newProductWithId.unit }]);
         }
     };
 
@@ -166,7 +164,7 @@ export default function EntryPage() {
         setIsAddItemSheetOpen(true);
     };
 
-    const handleFinalizeEntry = () => {
+    const handleFinalizeEntry = async () => {
         if (receivedItems.length === 0) {
             toast({
                 title: "Nenhum item adicionado",
@@ -176,37 +174,52 @@ export default function EntryPage() {
             return;
         }
         
-        setAllProducts(prevProducts => {
-            const newProducts = [...prevProducts];
-            receivedItems.forEach(item => {
-                const productIndex = newProducts.findIndex(p => p.id === item.id);
-                if (productIndex !== -1) {
-                    newProducts[productIndex].quantity += item.quantity;
+        try {
+            for (const item of receivedItems) {
+                const product = allProducts.find(p => p.id === item.id);
+                if (product) {
+                    const newQuantity = product.quantity + item.quantity;
+                    await updateProduct(item.id, { quantity: newQuantity });
+                    await addMovement({
+                        productId: item.id,
+                        date: new Date().toISOString(),
+                        type: 'Entrada',
+                        quantity: item.quantity,
+                        responsible: 'sdpinho29' // Mock responsible user
+                    });
                 }
-
-                // Add to movements (mock)
-                mockAddMovement({
-                    productId: item.id,
-                    date: new Date().toISOString(),
-                    type: 'Entrada',
-                    quantity: item.quantity,
-                    responsible: 'sdpinho29' // Mock responsible user
-                });
+            }
+            
+            // Refetch products to get updated quantities
+            const updatedProducts = await getProducts();
+            setAllProducts(updatedProducts);
+            
+            toast({
+                title: "Entrada Registrada!",
+                description: "A entrada de materiais foi registrada com sucesso.",
             });
-            return newProducts;
-        });
-        
-        toast({
-            title: "Entrada Registrada!",
-            description: "A entrada de materiais foi registrada com sucesso.",
-        });
 
-        // Reset form
-        setEntryDate(new Date());
-        setSupplier("");
-        setInvoice("");
-        setReceivedItems([]);
+            // Reset form
+            setEntryDate(new Date());
+            setSupplier("");
+            setInvoice("");
+            setReceivedItems([]);
+        } catch (error) {
+             toast({
+                title: "Erro ao Finalizar Entrada",
+                description: "Não foi possível registrar a entrada. Tente novamente.",
+                variant: "destructive"
+            });
+        }
     };
+
+  if (isLoading) {
+    return (
+        <div className="flex justify-center items-center h-full">
+            <p>Carregando dados...</p>
+        </div>
+    )
+  }
 
   return (
     <>
@@ -361,5 +374,3 @@ export default function EntryPage() {
     </>
   );
 }
-
-    
