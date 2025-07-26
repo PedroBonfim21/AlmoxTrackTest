@@ -56,6 +56,14 @@ export const updateProduct = async (productId: string, productData: Partial<Prod
     await updateDoc(productDoc, productData);
 };
 
+export const updateProductQuantityOnEntry = async (productId: string, quantity: number): Promise<void> => {
+    const productDoc = doc(db, 'products', productId);
+    await updateDoc(productDoc, {
+        quantity: increment(quantity)
+    });
+};
+
+
 export const finalizeEntry = async (entryData: EntryData): Promise<void> => {
     try {
         await runTransaction(db, async (transaction) => {
