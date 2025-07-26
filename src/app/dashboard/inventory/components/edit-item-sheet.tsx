@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -76,7 +77,7 @@ export function EditItemSheet({ isOpen, onOpenChange, onItemUpdated, item }: Edi
             category: item.category,
             image: null,
         });
-        setImagePreview(item.imagePreview || item.image);
+        setImagePreview(item.image);
     }
   }, [item, form, isOpen]);
 
@@ -110,10 +111,6 @@ export function EditItemSheet({ isOpen, onOpenChange, onItemUpdated, item }: Edi
 
   const onSubmit = (data: EditItemFormValues) => {
     onItemUpdated(data);
-    toast({
-      title: "Item Atualizado!",
-      description: `${data.name} foi atualizado com sucesso.`,
-    });
     onOpenChange(false);
   };
 

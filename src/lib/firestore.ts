@@ -1,6 +1,7 @@
 
-import { db } from './firebase';
-import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, query, where, writeBatch, runTransaction, getDoc, increment } from 'firebase/firestore';
+import { db, storage } from './firebase';
+import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, query, where, runTransaction, getDoc, increment } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 // Product Type
 export type Product = {
@@ -74,9 +75,15 @@ export const updateProduct = async (productId: string, productData: Partial<Prod
 };
 
 export const deleteProduct = async (productId: string): Promise<void> => {
-    // Also delete associated movements in a transaction? For now, just delete the product.
     const productDoc = doc(db, 'products', productId);
     await deleteDoc(productDoc);
+};
+
+export const uploadImage = async (file: File): Promise<string> => {
+    const storageRef = ref(storage, `products/${Date.now()}_${file.name}`);
+    await uploadBytes(storageRef, file);
+    const downloadURL = await getDownloadURL(storageRef);
+    return downloadURL;
 };
 
 
@@ -217,3 +224,10 @@ export const seedDatabase = async (products: Omit<Product, 'id'>[], movements: O
     await batch.commit();
     console.log('Database seeded successfully!');
 }
+
+export const updateProductQuantityOnEntry = async (productId: string, quantity: number): Promise<void> => {
+    const productRef = doc(db, 'products', productId);
+    await updateDoc(productRef, {
+        quantity: increment(quantity)
+    });
+};

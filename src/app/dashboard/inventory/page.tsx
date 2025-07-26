@@ -44,7 +44,7 @@ import { EditItemSheet } from "./components/edit-item-sheet";
 import { MovementsSheet } from "./components/movements-sheet";
 import { useToast } from "@/hooks/use-toast";
 import type { Product } from "@/lib/firestore";
-import { getProducts, addProduct, updateProduct, deleteProduct, addMovement } from "@/lib/firestore";
+import { getProducts, addProduct, updateProduct, deleteProduct, addMovement, uploadImage } from "@/lib/firestore";
 
 export default function InventoryPage() {
   const [products, setProducts] = React.useState<Product[]>([]);
@@ -69,58 +69,90 @@ export default function InventoryPage() {
   }, [fetchProducts]);
 
   const handleAddItem = React.useCallback(async (newItemData: any) => {
-    const itemCode = newItemData.itemCode?.trim() || `new-${Date.now()}`;
-    
-    const newProduct: Omit<Product, 'id'> = {
-      name: newItemData.name,
-      code: itemCode,
-      patrimony: newItemData.materialType === 'permanente' ? newItemData.patrimony : 'N/A',
-      type: newItemData.materialType,
-      quantity: newItemData.initialQuantity || 0,
-      unit: newItemData.unit,
-      category: newItemData.category,
-      image: "https://placehold.co/40x40.png"
-    };
+    setIsLoading(true);
+    try {
+        let imageUrl = "https://placehold.co/40x40.png";
+        if (newItemData.image) {
+            imageUrl = await uploadImage(newItemData.image);
+        }
 
-    const newProductId = await addProduct(newProduct);
+        const itemCode = newItemData.itemCode?.trim() || `new-${Date.now()}`;
+        
+        const newProduct: Omit<Product, 'id'> = {
+          name: newItemData.name,
+          code: itemCode,
+          patrimony: newItemData.materialType === 'permanente' ? newItemData.patrimony : 'N/A',
+          type: newItemData.materialType,
+          quantity: newItemData.initialQuantity || 0,
+          unit: newItemData.unit,
+          category: newItemData.category,
+          image: imageUrl,
+        };
 
-    if(newProduct.quantity > 0) {
-        await addMovement({
-            productId: newProductId,
-            date: new Date().toISOString(),
-            type: 'Entrada',
-            quantity: newProduct.quantity,
-            responsible: 'Sistema' // Or a logged in user
+        const newProductId = await addProduct(newProduct);
+
+        if(newProduct.quantity > 0) {
+            await addMovement({
+                productId: newProductId,
+                date: new Date().toISOString(),
+                type: 'Entrada',
+                quantity: newProduct.quantity,
+                responsible: 'Sistema' // Or a logged in user
+            });
+        }
+
+        toast({
+            title: "Item Adicionado!",
+            description: `${newProduct.name} foi adicionado ao inventário.`,
         });
+    } catch(error) {
+        toast({
+            title: "Erro ao Adicionar Item",
+            description: "Não foi possível adicionar o item. Tente novamente.",
+            variant: "destructive"
+        });
+    } finally {
+        fetchProducts();
+        setIsLoading(false);
     }
-
-    toast({
-        title: "Item Adicionado!",
-        description: `${newProduct.name} foi adicionado ao inventário.`,
-    });
-    fetchProducts();
   }, [fetchProducts, toast]);
   
   const handleUpdateItem = async (updatedItemData: any) => {
     if (!selectedItem) return;
+    setIsLoading(true);
+    try {
+        let imageUrl = selectedItem.image;
+        if (updatedItemData.image) {
+            imageUrl = await uploadImage(updatedItemData.image);
+        }
 
-    const updateData: Partial<Product> = {
-        name: updatedItemData.name,
-        type: updatedItemData.materialType,
-        code: updatedItemData.itemCode,
-        patrimony: updatedItemData.materialType === 'permanente' ? updatedItemData.patrimony : 'N/A',
-        unit: updatedItemData.unit,
-        quantity: updatedItemData.quantity,
-        category: updatedItemData.category,
-    };
-    
-    await updateProduct(selectedItem.id, updateData);
-    
-    toast({
-      title: "Item Atualizado!",
-      description: `${updatedItemData.name} foi atualizado com sucesso.`,
-    });
-    fetchProducts();
+        const updateData: Partial<Product> = {
+            name: updatedItemData.name,
+            type: updatedItemData.materialType,
+            code: updatedItemData.itemCode,
+            patrimony: updatedItemData.materialType === 'permanente' ? updatedItemData.patrimony : 'N/A',
+            unit: updatedItemData.unit,
+            quantity: updatedItemData.quantity,
+            category: updatedItemData.category,
+            image: imageUrl,
+        };
+        
+        await updateProduct(selectedItem.id, updateData);
+        
+        toast({
+          title: "Item Atualizado!",
+          description: `${updatedItemData.name} foi atualizado com sucesso.`,
+        });
+    } catch(error) {
+         toast({
+            title: "Erro ao Atualizar Item",
+            description: "Não foi possível atualizar o item. Tente novamente.",
+            variant: "destructive"
+        });
+    } finally {
+        fetchProducts();
+        setIsLoading(false);
+    }
   };
   
   const handleDeleteItem = async (productId: string) => {

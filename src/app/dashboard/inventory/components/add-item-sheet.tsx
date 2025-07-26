@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -95,7 +96,7 @@ export function AddItemSheet({ isOpen, onOpenChange, onItemAdded }: AddItemSheet
       const reader = new FileReader();
       reader.onloadend = () => {
         setImagePreview(reader.result as string);
-        form.setValue("image", file);
+        form.setValue("image", file); // Set the file object itself
       };
       reader.readAsDataURL(file);
     }
@@ -103,10 +104,6 @@ export function AddItemSheet({ isOpen, onOpenChange, onItemAdded }: AddItemSheet
 
   const onSubmit = (data: AddItemFormValues) => {
     onItemAdded(data);
-    toast({
-      title: "Item Adicionado!",
-      description: `${data.name} foi adicionado ao inventário com sucesso.`,
-    });
     onOpenChange(false);
   };
 
