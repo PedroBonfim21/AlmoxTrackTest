@@ -41,8 +41,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { usePathname } from "next/navigation";
-import { SheetTitle } from "@/components/ui/sheet";
-
 
 export default function DashboardLayout({
   children,
@@ -62,7 +60,6 @@ export default function DashboardLayout({
   return (
     <SidebarProvider>
       <Sidebar>
-          <SheetTitle className="sr-only">Menu de Navegação</SheetTitle>
         <SidebarHeader>
           <div className="flex items-center gap-2 p-2">
             <Warehouse className="w-8 h-8 text-primary" />
