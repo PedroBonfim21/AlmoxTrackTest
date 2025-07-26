@@ -113,31 +113,30 @@ export default function InventoryPage() {
   const { toast } = useToast();
 
 
-  const handleAddItem = (newItemData: any) => {
+  const handleAddItem = React.useCallback((newItemData: any) => {
     const itemCode = newItemData.itemCode?.trim();
 
-    if (itemCode) {
-      const existingProductIndex = products.findIndex(p => p.code === itemCode && p.type === newItemData.materialType && p.name === newItemData.name);
+    const existingProductIndex = products.findIndex(p => p.code === itemCode);
 
-      if (existingProductIndex > -1) {
+    if (itemCode && existingProductIndex > -1) {
         setProducts(prevProducts => {
-          const newProducts = [...prevProducts];
-          const existingProduct = newProducts[existingProductIndex];
-          existingProduct.quantity += newItemData.initialQuantity;
-
-          if (newItemData.image instanceof File) {
-            existingProduct.imagePreview = URL.createObjectURL(newItemData.image);
-          }
-          
-          toast({
-            title: "Estoque Atualizado!",
-            description: `A quantidade de ${existingProduct.name} foi atualizada.`,
-          });
-
-          return newProducts;
+            const newProducts = [...prevProducts];
+            const existingProduct = newProducts[existingProductIndex];
+            
+            existingProduct.quantity += newItemData.initialQuantity;
+            
+            if (newItemData.image instanceof File) {
+                existingProduct.imagePreview = URL.createObjectURL(newItemData.image);
+            }
+            
+            toast({
+                title: "Estoque Atualizado!",
+                description: `A quantidade de ${existingProduct.name} foi atualizada.`,
+            });
+            
+            return newProducts;
         });
         return;
-      }
     }
     
     const newItem: Product = {
@@ -157,7 +156,7 @@ export default function InventoryPage() {
     }
 
     setProducts(prevProducts => [...prevProducts, newItem]);
-  };
+  }, [products, toast]);
   
   const handleUpdateItem = (updatedItemData: any) => {
     setProducts(prevProducts =>
