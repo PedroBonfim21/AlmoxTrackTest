@@ -1,7 +1,8 @@
 
 import { db, storage } from './firebase';
-import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, query, where, runTransaction, getDoc, increment } from 'firebase/firestore';
+import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, query, where, runTransaction, getDoc, increment, writeBatch, QueryConstraint } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { parseISO } from 'date-fns';
 
 // Product Type
 export type Product = {
@@ -53,6 +54,16 @@ type ReturnData = {
     reason: string;
     responsible: string;
 }
+
+// Filter Type for getMovements
+type MovementFilters = {
+  startDate?: string;
+  endDate?: string;
+  movementType?: string;
+  materialType?: string;
+  department?: string;
+  products?: Product[]; // Needed for materialType filtering
+};
 
 
 // Product Functions
@@ -189,8 +200,44 @@ export const finalizeReturn = async (returnData: ReturnData): Promise<void> => {
 
 
 // Movement Functions
-export const getMovements = async (): Promise<Movement[]> => {
-    const snapshot = await getDocs(movementsCollection);
+export const getMovements = async (filters: MovementFilters = {}): Promise<Movement[]> => {
+    const { startDate, endDate, movementType, materialType, department, products } = filters;
+
+    let constraints: QueryConstraint[] = [];
+
+    if (startDate) {
+        constraints.push(where('date', '>=', startDate));
+    }
+    if (endDate) {
+        const toDate = new Date(parseISO(endDate));
+        toDate.setHours(23, 59, 59, 999);
+        constraints.push(where('date', '<=', toDate.toISOString()));
+    }
+    if (movementType) {
+        constraints.push(where('type', '==', movementType));
+    }
+    if (department) {
+        constraints.push(where('department', '==', department));
+    }
+    
+    // This filter cannot be done in the same query as other range filters.
+    // It's applied client-side after the main query.
+    if (materialType && products) {
+        const productIds = products
+            .filter((p) => p.type === materialType)
+            .map((p) => p.id);
+        
+        if (productIds.length > 0) {
+            constraints.push(where('productId', 'in', productIds));
+        } else {
+            // If no products match the material type, return no movements.
+            return [];
+        }
+    }
+
+    const finalQuery = query(movementsCollection, ...constraints);
+    const snapshot = await getDocs(finalQuery);
+
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Movement));
 };
 
@@ -207,27 +254,11 @@ export const addMovement = async (movementData: Omit<Movement, 'id'>): Promise<s
     return docRef.id;
 };
 
-// This function is useful for initializing the database with some data.
-export const seedDatabase = async (products: Omit<Product, 'id'>[], movements: Omit<Movement, 'id'>[]) => {
-    const batch = writeBatch(db);
-
-    products.forEach(product => {
-        const docRef = doc(collection(db, 'products'));
-        batch.set(docRef, product);
-    });
-
-    movements.forEach(movement => {
-        const docRef = doc(collection(db, 'movements'));
-        batch.set(docRef, movement);
-    });
-
-    await batch.commit();
-    console.log('Database seeded successfully!');
-}
-
 export const updateProductQuantityOnEntry = async (productId: string, quantity: number): Promise<void> => {
     const productRef = doc(db, 'products', productId);
     await updateDoc(productRef, {
         quantity: increment(quantity)
     });
 };
+
+    

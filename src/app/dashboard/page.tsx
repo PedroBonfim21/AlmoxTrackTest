@@ -15,7 +15,6 @@ import {
   Line,
 } from "recharts";
 import { format, subDays, parseISO, isValid } from "date-fns";
-import { DateRange } from "react-day-picker";
 import { ptBR } from "date-fns/locale";
 import {
   ArrowDown,
@@ -56,8 +55,8 @@ import { useToast } from "@/hooks/use-toast";
 
 export default function DashboardPage() {
   const [products, setProducts] = React.useState<Product[]>([]);
-  const [allMovements, setAllMovements] = React.useState<Movement[]>([]);
-  const [filteredMovements, setFilteredMovements] = React.useState<Movement[]>([]);
+  const [movements, setMovements] = React.useState<Movement[]>([]);
+  const [allDepartments, setAllDepartments] = React.useState<string[]>([]);
   
   const [startDate, setStartDate] = React.useState<Date | undefined>(subDays(new Date(), 29));
   const [endDate, setEndDate] = React.useState<Date | undefined>(new Date());
@@ -67,95 +66,56 @@ export default function DashboardPage() {
   const [department, setDepartment] = React.useState("all");
   const [isLoading, setIsLoading] = React.useState(true);
   const { toast } = useToast();
-
-  const fetchData = React.useCallback(async () => {
-        setIsLoading(true);
-        try {
-            const [productsData, movementsData] = await Promise.all([getProducts(), getMovements()]);
-            setProducts(productsData);
-            setAllMovements(movementsData);
-        } catch (error) {
-            toast({
-                title: "Erro ao Carregar Dados",
-                description: "Não foi possível buscar os dados do dashboard.",
-                variant: "destructive",
-            });
-        } finally {
-            setIsLoading(false);
-        }
-    }, [toast]);
-
-    React.useEffect(() => {
-        fetchData();
-    }, [fetchData]);
-
   
-  const handleApplyFilters = React.useCallback(() => {
-    let newFilteredMovements = allMovements;
+  const fetchDashboardData = React.useCallback(async () => {
+    setIsLoading(true);
+    try {
+      // Pass filters directly to the backend
+      const [productsData, movementsData, allMovementsForDepartments] = await Promise.all([
+        getProducts(),
+        getMovements({
+          startDate: startDate ? startDate.toISOString() : undefined,
+          endDate: endDate ? endDate.toISOString() : undefined,
+          movementType: movementType !== "all" ? movementType : undefined,
+          materialType: materialType !== "all" ? materialType : undefined,
+          department: department !== "all" ? department : undefined,
+          products // Pass products for materialType filtering
+        }),
+        getMovements() // Fetch all once to populate department filter
+      ]);
+      
+      setProducts(productsData);
+      setMovements(movementsData);
 
-    // Filter by date
-    if (startDate && endDate) {
-        newFilteredMovements = newFilteredMovements.filter(m => {
-            const movementDate = parseISO(m.date);
-            if (!isValid(movementDate)) return false;
-            // Set time to beginning of the day for `from` and end of the day for `to`
-            const fromDate = new Date(startDate!);
-            fromDate.setHours(0, 0, 0, 0);
-            const toDate = new Date(endDate!);
-            toDate.setHours(23, 59, 59, 999);
-            return movementDate >= fromDate && movementDate <= toDate;
-        });
+      const uniqueDeps = [...new Set(allMovementsForDepartments.map((m) => m.department).filter(Boolean as any))];
+      setAllDepartments(uniqueDeps);
+
+    } catch (error) {
+      toast({
+        title: "Erro ao Carregar Dados",
+        description: "Não foi possível buscar os dados do dashboard.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
     }
+  }, [startDate, endDate, movementType, materialType, department, products, toast]);
 
-    // Filter by movement type
-    if (movementType !== "all") {
-      newFilteredMovements = newFilteredMovements.filter(
-        (m) => m.type === movementType
-      );
-    }
-
-    // Filter by material type
-    if (materialType !== "all") {
-      const productIds = products
-        .filter((p) => p.type === materialType)
-        .map((p) => p.id);
-      newFilteredMovements = newFilteredMovements.filter((m) =>
-        productIds.includes(m.productId)
-      );
-    }
-
-    // Filter by department
-    if (department !== "all") {
-      newFilteredMovements = newFilteredMovements.filter(
-        (m) => m.department === department
-      );
-    }
-
-    setFilteredMovements(newFilteredMovements);
-  }, [allMovements, startDate, endDate, movementType, materialType, department, products]);
-
-  // Run on mount and when filters change
   React.useEffect(() => {
-    if (!isLoading) {
-        handleApplyFilters();
-    }
-  }, [isLoading, handleApplyFilters]);
+    fetchDashboardData();
+  }, [fetchDashboardData]);
 
-  const uniqueDepartments = React.useMemo(() => 
-    [...new Set(allMovements.map((m) => m.department).filter(Boolean as any))]
-  , [allMovements]);
-
-  const totalMovements = filteredMovements.length;
-  const totalEntries = filteredMovements.filter(
+  const totalMovements = movements.length;
+  const totalEntries = movements.filter(
     (m) => m.type === "Entrada"
   ).length;
-  const totalExits = filteredMovements.filter(
+  const totalExits = movements.filter(
     (m) => m.type === "Saída"
   ).length;
 
   const mostMovedItem = React.useMemo(() => {
-    if (filteredMovements.length === 0 || products.length === 0) return { name: "N/A", count: 0 };
-    const counts = filteredMovements.reduce((acc, mov) => {
+    if (movements.length === 0 || products.length === 0) return { name: "N/A", count: 0 };
+    const counts = movements.reduce((acc, mov) => {
       acc[mov.productId] = (acc[mov.productId] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
@@ -166,11 +126,11 @@ export default function DashboardPage() {
     );
     const product = products.find((p) => p.id === mostMovedId);
     return { name: product?.name || "Desconhecido", count: counts[mostMovedId] };
-  }, [filteredMovements, products]);
+  }, [movements, products]);
 
   const topSector = React.useMemo(() => {
-    if (filteredMovements.length === 0) return { name: "N/A", count: 0 };
-    const counts = filteredMovements.reduce((acc, mov) => {
+    if (movements.length === 0) return { name: "N/A", count: 0 };
+    const counts = movements.reduce((acc, mov) => {
       if (mov.department) {
         acc[mov.department] = (acc[mov.department] || 0) + 1;
       }
@@ -181,11 +141,11 @@ export default function DashboardPage() {
       counts[a] > counts[b] ? a : b
     );
     return { name: topSectorName, count: counts[topSectorName] };
-  }, [filteredMovements]);
+  }, [movements]);
 
   const movementsByDay = React.useMemo(() => {
     const dailyData: Record<string, { Entrada: number; Saída: number }> = {};
-    filteredMovements.forEach((mov) => {
+    movements.forEach((mov) => {
       if (!isValid(parseISO(mov.date))) return;
       const day = format(parseISO(mov.date), "dd/MM");
       if (!dailyData[day]) {
@@ -200,11 +160,11 @@ export default function DashboardPage() {
     return Object.entries(dailyData)
       .map(([name, values]) => ({ name, ...values }))
       .sort((a, b) => (parseISO(a.name) > parseISO(b.name) ? 1 : -1));
-  }, [filteredMovements]);
+  }, [movements]);
 
   const top10Items = React.useMemo(() => {
-    if (filteredMovements.length === 0 || products.length === 0) return [];
-    const counts = filteredMovements.reduce((acc, mov) => {
+    if (movements.length === 0 || products.length === 0) return [];
+    const counts = movements.reduce((acc, mov) => {
       acc[mov.productId] = (acc[mov.productId] || 0) + mov.quantity;
       return acc;
     }, {} as Record<string, number>);
@@ -216,11 +176,11 @@ export default function DashboardPage() {
         const product = products.find((p) => p.id === productId);
         return { name: product?.name || "Desconhecido", total };
       });
-  }, [filteredMovements, products]);
+  }, [movements, products]);
   
   const handleExport = () => {
         const headers = ["Data", "Tipo", "Produto", "Quantidade", "Responsável", "Departamento"];
-        const rows = filteredMovements.map(mov => {
+        const rows = movements.map(mov => {
             const product = products.find(p => p.id === mov.productId);
             return [
                 isValid(parseISO(mov.date)) ? format(parseISO(mov.date), "dd/MM/yyyy HH:mm") : 'Data Inválida',
@@ -358,7 +318,7 @@ export default function DashboardPage() {
                 </SelectTrigger>
                 <SelectContent>
                     <SelectItem value="all">Todos Setores</SelectItem>
-                    {uniqueDepartments.map((dep) => (
+                    {allDepartments.map((dep) => (
                     <SelectItem key={dep} value={dep}>
                         {dep}
                     </SelectItem>
@@ -512,3 +472,5 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+    
