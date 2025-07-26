@@ -56,7 +56,6 @@ type RequestedItem = {
 
 export default function ExitPage() {
     const { toast } = useToast();
-    const [allProducts, setAllProducts] = React.useState<Product[]>([]);
     const [activeTab, setActiveTab] = React.useState("consumption");
 
     // State for Consumption Tab
@@ -84,18 +83,24 @@ export default function ExitPage() {
     const [responsibilityItems, setResponsibilityItems] = React.useState<RequestedItem[]>([]);
     const [isConfirmDialogOpen, setIsConfirmDialogOpen] = React.useState(false);
     const [isTermAccepted, setIsTermAccepted] = React.useState(false);
-    const [isLoading, setIsLoading] = React.useState(true);
+    const [isLoading, setIsLoading] = React.useState(false);
     const [isFinalizing, setIsFinalizing] = React.useState(false);
     
-    const fetchProducts = React.useCallback(async () => {
+    const fetchProducts = React.useCallback(async (term: string, type: 'consumo' | 'permanente') => {
         setIsLoading(true);
         try {
-            const productsFromDb = await getProducts();
-            setAllProducts(productsFromDb);
+            const productsFromDb = await getProducts({ searchTerm: term, materialType: type });
+            if (type === 'consumo') {
+                setConsumptionSearchResults(productsFromDb);
+                if (productsFromDb.length > 0) setIsConsumptionSearchOpen(true);
+            } else {
+                setResponsibilitySearchResults(productsFromDb);
+                if (productsFromDb.length > 0) setIsResponsibilitySearchOpen(true);
+            }
         } catch(error) {
              toast({
-                title: "Erro ao Carregar Produtos",
-                description: "Não foi possível buscar os produtos do banco de dados.",
+                title: "Erro ao Buscar Produtos",
+                description: "Não foi possível buscar os produtos.",
                 variant: "destructive",
             });
         } finally {
@@ -104,45 +109,28 @@ export default function ExitPage() {
     }, [toast]);
 
     React.useEffect(() => {
-        fetchProducts();
-    }, [fetchProducts]);
-
-    const consumableItems = React.useMemo(() => 
-        allProducts.filter(p => p.type === 'consumo'), 
-    [allProducts]);
-    
-    const permanentItems = React.useMemo(() =>
-        allProducts.filter(p => p.type === 'permanente'),
-    [allProducts]);
-
-
-    React.useEffect(() => {
-        if (consumptionSearchTerm.trim()) {
-            const results = consumableItems.filter(item =>
-                item.name.toLowerCase().includes(consumptionSearchTerm.toLowerCase()) ||
-                item.code.toLowerCase().includes(consumptionSearchTerm.toLowerCase())
-            );
-            setConsumptionSearchResults(results);
-            setIsConsumptionSearchOpen(results.length > 0);
-        } else {
-            setConsumptionSearchResults([]);
-            setIsConsumptionSearchOpen(false);
-        }
-    }, [consumptionSearchTerm, consumableItems]);
+        const handler = setTimeout(() => {
+            if (consumptionSearchTerm.trim().length > 1) {
+                fetchProducts(consumptionSearchTerm.trim(), 'consumo');
+            } else {
+                setConsumptionSearchResults([]);
+                setIsConsumptionSearchOpen(false);
+            }
+        }, 500);
+        return () => clearTimeout(handler);
+    }, [consumptionSearchTerm, fetchProducts]);
 
      React.useEffect(() => {
-        if (responsibilitySearchTerm.trim()) {
-            const results = permanentItems.filter(item =>
-                item.name.toLowerCase().includes(responsibilitySearchTerm.toLowerCase()) ||
-                item.code.toLowerCase().includes(responsibilitySearchTerm.toLowerCase())
-            );
-            setResponsibilitySearchResults(results);
-            setIsResponsibilitySearchOpen(results.length > 0);
-        } else {
-            setResponsibilitySearchResults([]);
-            setIsResponsibilitySearchOpen(false);
-        }
-    }, [responsibilitySearchTerm, permanentItems]);
+        const handler = setTimeout(() => {
+            if (responsibilitySearchTerm.trim().length > 1) {
+                fetchProducts(responsibilitySearchTerm.trim(), 'permanente');
+            } else {
+                setResponsibilitySearchResults([]);
+                setIsResponsibilitySearchOpen(false);
+            }
+        }, 500);
+        return () => clearTimeout(handler);
+    }, [responsibilitySearchTerm, fetchProducts]);
     
     const handleSelectSearchItem = (item: Product, type: 'consumption' | 'responsibility') => {
         if (type === 'consumption') {
@@ -158,7 +146,7 @@ export default function ExitPage() {
     const handleAddItem = (type: 'consumption' | 'responsibility') => {
         const searchTerm = type === 'consumption' ? consumptionSearchTerm : responsibilitySearchTerm;
         const quantity = type === 'consumption' ? consumptionQuantity : responsibilityQuantity;
-        const items = type === 'consumption' ? consumableItems : permanentItems;
+        const searchResults = type === 'consumption' ? consumptionSearchResults : responsibilitySearchResults;
         const setRequestedItemsFn = type === 'consumption' ? setRequestedItems : setResponsibilityItems;
 
         if (!searchTerm.trim()) {
@@ -166,9 +154,8 @@ export default function ExitPage() {
             return;
         }
 
-        const item = items.find(i => 
-            i.name.toLowerCase() === searchTerm.toLowerCase() || 
-            i.code.toLowerCase() === searchTerm.toLowerCase()
+        const item = searchResults.find(i => 
+            i.name.toLowerCase() === searchTerm.toLowerCase()
         );
 
         if (!item) {
@@ -235,8 +222,6 @@ export default function ExitPage() {
                 purpose: purpose,
                 responsible: 'sdpinho29' // Mock responsible
             });
-
-            await fetchProducts();
             
             toast({ title: "Saída Registrada!", description: "A saída de materiais de consumo foi registrada com sucesso." });
             
@@ -285,8 +270,6 @@ export default function ExitPage() {
                 responsible: 'sdpinho29' // Mock responsible
             });
 
-            await fetchProducts();
-
             toast({ title: "Termo Gerado e Saída Registrada!", description: "A saída de material permanente foi registrada com sucesso." });
             
             setTimeout(() => {
@@ -312,14 +295,6 @@ export default function ExitPage() {
             setIsFinalizing(false);
         }
     };
-
-     if (isLoading) {
-        return (
-            <div className="flex justify-center items-center h-full">
-                <p>Carregando dados...</p>
-            </div>
-        )
-    }
 
     return (
         <div className="flex flex-col gap-6">
@@ -613,7 +588,7 @@ export default function ExitPage() {
                                     </TableHeader>
                                     <TableBody>
                                         {responsibilityItems.map(reqItem => {
-                                            const product = permanentItems.find(p => p.id === reqItem.id);
+                                            const product = responsibilitySearchResults.find(p => p.id === reqItem.id);
                                             return (
                                                 <TableRow key={reqItem.id}>
                                                     <TableCell>{product?.patrimony || 'N/A'}</TableCell>
@@ -686,3 +661,5 @@ export default function ExitPage() {
         </div>
     );
 }
+
+    

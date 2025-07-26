@@ -1,6 +1,6 @@
 
 import { db, storage } from './firebase';
-import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, query, where, runTransaction, getDoc, increment, writeBatch, QueryConstraint } from 'firebase/firestore';
+import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, query, where, runTransaction, getDoc, increment, writeBatch, QueryConstraint, or } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { parseISO } from 'date-fns';
 
@@ -65,13 +65,44 @@ type MovementFilters = {
   products?: Product[]; // Needed for materialType filtering
 };
 
+type ProductFilters = {
+    searchTerm?: string;
+    materialType?: 'consumo' | 'permanente';
+}
+
 
 // Product Functions
 const productsCollection = collection(db, 'products');
 const movementsCollection = collection(db, 'movements');
 
-export const getProducts = async (): Promise<Product[]> => {
-    const snapshot = await getDocs(productsCollection);
+export const getProducts = async (filters: ProductFilters = {}): Promise<Product[]> => {
+    const { searchTerm, materialType } = filters;
+    
+    let constraints: QueryConstraint[] = [];
+
+    if (materialType) {
+        constraints.push(where('type', '==', materialType));
+    }
+
+    if (searchTerm) {
+        const term = searchTerm.toLowerCase();
+        // Firestore doesn't support case-insensitive `startsWith` queries natively.
+        // A common workaround is to store a lowercase version of the field.
+        // For this project, we'll use a >= and <= trick for a "starts with" search.
+        // This is case-sensitive. For a full-text search solution, a third-party
+        // service like Algolia or Typesense integrated with Firebase Extensions is recommended.
+        constraints.push(
+            or(
+                where('name', '>=', searchTerm),
+                where('name', '<=', searchTerm + '\uf8ff'),
+                where('code', '==', searchTerm)
+            )
+        );
+    }
+    
+    const finalQuery = query(productsCollection, ...constraints);
+    const snapshot = await getDocs(finalQuery);
+
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
 };
 

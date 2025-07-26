@@ -61,18 +61,21 @@ export default function EntryPage() {
     
     const [isAddItemSheetOpen, setIsAddItemSheetOpen] = React.useState(false);
     const [isAuthDialogOpen, setIsAuthDialogOpen] = React.useState(false);
-    const [isLoading, setIsLoading] = React.useState(true);
+    const [isLoading, setIsLoading] = React.useState(false);
     const [isFinalizing, setIsFinalizing] = React.useState(false);
 
-    const fetchProducts = React.useCallback(async () => {
+    const fetchProducts = React.useCallback(async (term: string) => {
         setIsLoading(true);
         try {
-            const productsFromDb = await getProducts();
-            setAllProducts(productsFromDb);
+            const productsFromDb = await getProducts({ searchTerm: term });
+            setSearchResults(productsFromDb);
+            if (productsFromDb.length > 0) {
+                setIsSearchOpen(true);
+            }
         } catch (error) {
             toast({
-                title: "Erro ao Carregar Produtos",
-                description: "Não foi possível buscar os produtos do banco de dados.",
+                title: "Erro ao Buscar Produtos",
+                description: "Não foi possível buscar os produtos.",
                 variant: "destructive",
             });
         } finally {
@@ -81,32 +84,46 @@ export default function EntryPage() {
     }, [toast]);
 
     React.useEffect(() => {
-        fetchProducts();
-    }, [fetchProducts]);
+        const handler = setTimeout(() => {
+            if (searchTerm.trim().length > 1) {
+                fetchProducts(searchTerm.trim());
+            } else {
+                setSearchResults([]);
+                setIsSearchOpen(false);
+            }
+        }, 500); // Debounce search
 
-    React.useEffect(() => {
-       if (searchTerm.trim()) {
-            const results = allProducts.filter(item =>
-                item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                item.code.toLowerCase().includes(searchTerm.toLowerCase())
-            );
-            setSearchResults(results);
-            setIsSearchOpen(true);
-       } else {
-            setSearchResults([]);
-            setIsSearchOpen(false);
-       }
-    }, [searchTerm, allProducts]);
+        return () => {
+            clearTimeout(handler);
+        };
+    }, [searchTerm, fetchProducts]);
+    
+    const refreshLocalProductList = React.useCallback(async () => {
+        try {
+            // This could be optimized to not fetch all products again
+            // For now, it ensures the local list is up-to-date
+            const productsFromDb = await getProducts();
+            setAllProducts(productsFromDb);
+        } catch (error) {
+            toast({
+                title: "Erro ao Atualizar Lista",
+                description: "Não foi possível atualizar a lista de produtos.",
+                variant: "destructive",
+            });
+        }
+    }, [toast]);
 
     const handleSelectSearchItem = (item: Product) => {
         setSearchTerm(item.name);
         setIsSearchOpen(false);
     }
     
-    const handleSearchOrAddItem = () => {
+    const handleSearchOrAddItem = async () => {
         if (!searchTerm) return;
         
-        const existingItem = allProducts.find(item => item.name.toLowerCase() === searchTerm.toLowerCase());
+        // Ensure we have the latest product list before checking existence
+        const currentProducts = await getProducts({searchTerm});
+        const existingItem = currentProducts.find(item => item.name.toLowerCase() === searchTerm.toLowerCase());
         
         if (existingItem) {
             handleAddToList(existingItem);
@@ -166,7 +183,7 @@ export default function EntryPage() {
             const newProductId = await addProduct(newProductData);
             const newProductWithId = { ...newProductData, id: newProductId };
             
-            setAllProducts(prev => [...prev, newProductWithId]);
+            await refreshLocalProductList();
             
             toast({
                 title: "Item Adicionado!",
@@ -225,7 +242,7 @@ export default function EntryPage() {
                 responsible: 'sdpinho29' // Mock responsible user
             });
             
-            await fetchProducts();
+            await refreshLocalProductList();
             
             toast({
                 title: "Entrada Registrada!",
@@ -247,14 +264,6 @@ export default function EntryPage() {
             setIsFinalizing(false);
         }
     };
-
-  if (isLoading && !isFinalizing) {
-    return (
-        <div className="flex justify-center items-center h-full">
-            <p>Carregando dados...</p>
-        </div>
-    )
-  }
 
   return (
     <>
@@ -409,3 +418,5 @@ export default function EntryPage() {
     </>
   );
 }
+
+    

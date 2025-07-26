@@ -51,7 +51,6 @@ type ReturnedItem = {
 
 export default function ReturnsPage() {
     const { toast } = useToast();
-    const [allProducts, setAllProducts] = React.useState<Product[]>([]);
     const [returnDate, setReturnDate] = React.useState<Date | undefined>(new Date());
     const [returningDepartment, setReturningDepartment] = React.useState("");
     const [returnReason, setReturnReason] = React.useState("");
@@ -60,18 +59,21 @@ export default function ReturnsPage() {
     const [returnedItems, setReturnedItems] = React.useState<ReturnedItem[]>([]);
     const [searchResults, setSearchResults] = React.useState<Product[]>([]);
     const [isSearchOpen, setIsSearchOpen] = React.useState(false);
-    const [isLoading, setIsLoading] = React.useState(true);
+    const [isLoading, setIsLoading] = React.useState(false);
     const [isFinalizing, setIsFinalizing] = React.useState(false);
 
-    const fetchProducts = React.useCallback(async () => {
+    const fetchProducts = React.useCallback(async (term: string) => {
         setIsLoading(true);
         try {
-            const productsFromDb = await getProducts();
-            setAllProducts(productsFromDb);
+            const productsFromDb = await getProducts({ searchTerm: term });
+            setSearchResults(productsFromDb);
+            if (productsFromDb.length > 0) {
+                setIsSearchOpen(true);
+            }
         } catch (error) {
              toast({
-                title: "Erro ao Carregar Produtos",
-                description: "Não foi possível buscar os produtos do banco de dados.",
+                title: "Erro ao Buscar Produtos",
+                description: "Não foi possível buscar os produtos.",
                 variant: "destructive",
             });
         } finally {
@@ -80,22 +82,19 @@ export default function ReturnsPage() {
     }, [toast]);
 
     React.useEffect(() => {
-        fetchProducts();
-    }, [fetchProducts]);
+        const handler = setTimeout(() => {
+            if (searchTerm.trim().length > 1) {
+                fetchProducts(searchTerm.trim());
+            } else {
+                setSearchResults([]);
+                setIsSearchOpen(false);
+            }
+        }, 500); // Debounce search
 
-    React.useEffect(() => {
-        if (searchTerm.trim()) {
-            const results = allProducts.filter(item =>
-                item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                item.code.toLowerCase().includes(searchTerm.toLowerCase())
-            );
-            setSearchResults(results);
-            setIsSearchOpen(true);
-        } else {
-            setSearchResults([]);
-            setIsSearchOpen(false);
-        }
-    }, [searchTerm, allProducts]);
+        return () => {
+            clearTimeout(handler);
+        };
+    }, [searchTerm, fetchProducts]);
 
     const handleSelectSearchItem = (item: Product) => {
         setSearchTerm(item.name);
@@ -105,7 +104,7 @@ export default function ReturnsPage() {
     const handleAddToList = () => {
         if (!searchTerm) return;
         
-        const item = allProducts.find(p => p.name.toLowerCase() === searchTerm.toLowerCase());
+        const item = searchResults.find(p => p.name.toLowerCase() === searchTerm.toLowerCase());
 
         if (!item) {
              toast({
@@ -170,8 +169,6 @@ export default function ReturnsPage() {
                 responsible: 'sdpinho29' // Mock responsible
             });
 
-            await fetchProducts();
-
             toast({
                 title: "Devolução Registrada!",
                 description: "A devolução de materiais foi registrada com sucesso.",
@@ -192,14 +189,6 @@ export default function ReturnsPage() {
             setIsFinalizing(false);
         }
     };
-
-    if (isLoading) {
-        return (
-            <div className="flex justify-center items-center h-full">
-                <p>Carregando dados...</p>
-            </div>
-        )
-    }
 
     return (
         <div className="flex flex-col gap-6">
@@ -342,3 +331,5 @@ export default function ReturnsPage() {
         </div>
     );
 }
+
+    
