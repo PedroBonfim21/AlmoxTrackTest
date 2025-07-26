@@ -52,7 +52,12 @@ export default function DashboardPage() {
         if (date?.from && date?.to) {
             newFilteredMovements = newFilteredMovements.filter(m => {
                 const movementDate = new Date(m.date);
-                return movementDate >= date.from! && movementDate <= date.to!;
+                // Set hours to 0 to compare dates only
+                const fromDate = new Date(date.from!);
+                fromDate.setHours(0, 0, 0, 0);
+                const toDate = new Date(date.to!);
+                toDate.setHours(23, 59, 59, 999);
+                return movementDate >= fromDate && movementDate <= toDate;
             });
         }
         
@@ -182,66 +187,68 @@ export default function DashboardPage() {
             Use os filtros para analisar os dados de movimentações.
           </CardDescription>
         </CardHeader>
-        <CardContent className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-            <Popover>
-                <PopoverTrigger asChild>
-                <Button
-                    id="date"
-                    variant={"outline"}
-                    className={cn(
-                    "w-full justify-start text-left font-normal",
-                    !date && "text-muted-foreground"
-                    )}
-                >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {date?.from ? (
-                    date.to ? (
-                        <>
-                        {format(date.from, "P", { locale: ptBR })} -{" "}
-                        {format(date.to, "P", { locale: ptBR })}
-                        </>
-                    ) : (
-                        format(date.from, "P", { locale: ptBR })
-                    )
-                    ) : (
-                    <span>Selecione um período</span>
-                    )}
-                </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                    initialFocus
-                    mode="range"
-                    defaultMonth={date?.from}
-                    selected={date}
-                    onSelect={setDate}
-                    numberOfMonths={2}
-                    locale={ptBR}
-                />
-                </PopoverContent>
-            </Popover>
-            <Select value={movementType} onValueChange={setMovementType}>
-                <SelectTrigger>
-                    <SelectValue placeholder="Tipo de Movimentação" />
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectItem value="all">Todos</SelectItem>
-                    <SelectItem value="Entrada">Entrada</SelectItem>
-                    <SelectItem value="Saída">Saída</SelectItem>
-                    <SelectItem value="Devolução">Devolução</SelectItem>
-                </SelectContent>
-            </Select>
-            <Select value={materialType} onValueChange={setMaterialType}>
-                <SelectTrigger>
-                    <SelectValue placeholder="Tipo de Material" />
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectItem value="all">Todos</SelectItem>
-                    <SelectItem value="consumo">Consumo</SelectItem>
-                    <SelectItem value="permanente">Permanente</SelectItem>
-                </SelectContent>
-            </Select>
-            <Button onClick={handleApplyFilters}>Aplicar Filtros</Button>
+        <CardContent>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                <Popover>
+                    <PopoverTrigger asChild>
+                    <Button
+                        id="date"
+                        variant={"outline"}
+                        className={cn(
+                        "w-full justify-start text-left font-normal col-span-1 lg:col-span-2",
+                        !date && "text-muted-foreground"
+                        )}
+                    >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {date?.from ? (
+                        date.to ? (
+                            <>
+                            {format(date.from, "P", { locale: ptBR })} -{" "}
+                            {format(date.to, "P", { locale: ptBR })}
+                            </>
+                        ) : (
+                            format(date.from, "P", { locale: ptBR })
+                        )
+                        ) : (
+                        <span>Selecione um período</span>
+                        )}
+                    </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                        initialFocus
+                        mode="range"
+                        defaultMonth={date?.from}
+                        selected={date}
+                        onSelect={setDate}
+                        numberOfMonths={2}
+                        locale={ptBR}
+                    />
+                    </PopoverContent>
+                </Popover>
+                <Select value={movementType} onValueChange={setMovementType}>
+                    <SelectTrigger>
+                        <SelectValue placeholder="Tipo de Movimentação" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">Todos os Tipos</SelectItem>
+                        <SelectItem value="Entrada">Entrada</SelectItem>
+                        <SelectItem value="Saída">Saída</SelectItem>
+                        <SelectItem value="Devolução">Devolução</SelectItem>
+                    </SelectContent>
+                </Select>
+                <Select value={materialType} onValueChange={setMaterialType}>
+                    <SelectTrigger>
+                        <SelectValue placeholder="Tipo de Material" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">Todos os Materiais</SelectItem>
+                        <SelectItem value="consumo">Consumo</SelectItem>
+                        <SelectItem value="permanente">Permanente</SelectItem>
+                    </SelectContent>
+                </Select>
+                <Button onClick={handleApplyFilters} className="w-full">Aplicar Filtros</Button>
+            </div>
         </CardContent>
       </Card>
       
