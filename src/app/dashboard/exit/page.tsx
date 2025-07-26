@@ -107,8 +107,14 @@ export default function ExitPage() {
         fetchProducts();
     }, [fetchProducts]);
 
-    const consumableItems = allProducts.filter(p => p.type === 'consumo');
-    const permanentItems = allProducts.filter(p => p.type === 'permanente');
+    const consumableItems = React.useMemo(() => 
+        allProducts.filter(p => p.type === 'consumo'), 
+    [allProducts]);
+    
+    const permanentItems = React.useMemo(() =>
+        allProducts.filter(p => p.type === 'permanente'),
+    [allProducts]);
+
 
     React.useEffect(() => {
         if (consumptionSearchTerm.trim()) {
