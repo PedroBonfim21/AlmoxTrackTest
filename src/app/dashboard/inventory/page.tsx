@@ -44,7 +44,7 @@ import { EditItemSheet } from "./components/edit-item-sheet";
 import { MovementsSheet } from "./components/movements-sheet";
 import { useToast } from "@/hooks/use-toast";
 import type { Product } from "@/lib/firestore";
-import { getProducts, addProduct, updateProduct, deleteProduct, updateProductQuantityOnEntry, addMovement } from "@/lib/firestore";
+import { getProducts, addProduct, updateProduct, deleteProduct, addMovement } from "@/lib/firestore";
 
 export default function InventoryPage() {
   const [products, setProducts] = React.useState<Product[]>([]);
@@ -69,46 +69,37 @@ export default function InventoryPage() {
   }, [fetchProducts]);
 
   const handleAddItem = React.useCallback(async (newItemData: any) => {
-    const itemCode = newItemData.itemCode?.trim();
-    
-    // Check if an item with the same code already exists
-    if (itemCode) {
-      const existingProduct = products.find(p => p.code === itemCode);
-      if (existingProduct) {
-          await updateProductQuantityOnEntry(existingProduct.id, newItemData.initialQuantity);
-          toast({
-              title: "Estoque Atualizado!",
-              description: `A quantidade de ${existingProduct.name} foi atualizada.`,
-          });
-          fetchProducts(); // Refetch to update UI
-          return;
-      }
-    }
+    const itemCode = newItemData.itemCode?.trim() || `new-${Date.now()}`;
     
     const newProduct: Omit<Product, 'id'> = {
       name: newItemData.name,
-      code: itemCode || `00${products.length + 1}-25`,
+      code: itemCode,
       patrimony: newItemData.materialType === 'permanente' ? newItemData.patrimony : 'N/A',
       type: newItemData.materialType,
-      quantity: newItemData.initialQuantity,
+      quantity: newItemData.initialQuantity || 0,
       unit: newItemData.unit,
       category: newItemData.category,
       image: "https://placehold.co/40x40.png"
     };
 
     const newProductId = await addProduct(newProduct);
-    if(newItemData.initialQuantity > 0) {
+
+    if(newProduct.quantity > 0) {
         await addMovement({
             productId: newProductId,
             date: new Date().toISOString(),
             type: 'Entrada',
-            quantity: newItemData.initialQuantity,
-            responsible: 'Sistema'
+            quantity: newProduct.quantity,
+            responsible: 'Sistema' // Or a logged in user
         });
     }
 
-    fetchProducts(); // Refetch to update UI
-  }, [products, toast, fetchProducts]);
+    toast({
+        title: "Item Adicionado!",
+        description: `${newProduct.name} foi adicionado ao inventário.`,
+    });
+    fetchProducts();
+  }, [fetchProducts, toast]);
   
   const handleUpdateItem = async (updatedItemData: any) => {
     if (!selectedItem) return;

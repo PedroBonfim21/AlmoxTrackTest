@@ -73,17 +73,6 @@ export const updateProduct = async (productId: string, productData: Partial<Prod
     await updateDoc(productDoc, productData);
 };
 
-export const updateProductQuantityOnEntry = async (productId: string, quantity: number): Promise<void> => {
-    const productRef = doc(db, 'products', productId);
-    await runTransaction(db, async (transaction) => {
-        const productDoc = await transaction.get(productRef);
-        if (!productDoc.exists()) {
-            throw new Error("Product does not exist!");
-        }
-        transaction.update(productRef, { quantity: increment(quantity) });
-    });
-};
-
 export const deleteProduct = async (productId: string): Promise<void> => {
     // Also delete associated movements in a transaction? For now, just delete the product.
     const productDoc = doc(db, 'products', productId);
