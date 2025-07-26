@@ -31,6 +31,16 @@ import {
 import { Calendar } from "@/components/ui/calendar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { products as allProducts, addMovement } from "@/lib/mock-data";
@@ -44,30 +54,48 @@ type RequestedItem = {
 
 export default function ExitPage() {
     const { toast } = useToast();
+    const [activeTab, setActiveTab] = React.useState("consumption");
+
+    // State for Consumption Tab
     const [requestDate, setRequestDate] = React.useState<Date | undefined>(new Date());
     const [requesterName, setRequesterName] = React.useState("");
     const [department, setDepartment] = React.useState("");
     const [purpose, setPurpose] = React.useState("");
-    
-    const [searchTerm, setSearchTerm] = React.useState("");
-    const [quantity, setQuantity] = React.useState(1);
+    const [consumptionSearchTerm, setConsumptionSearchTerm] = React.useState("");
+    const [consumptionQuantity, setConsumptionQuantity] = React.useState(1);
     const [requestedItems, setRequestedItems] = React.useState<RequestedItem[]>([]);
+
+    // State for Responsibility Tab
+    const [responsibilityDate, setResponsibilityDate] = React.useState<Date | undefined>(new Date());
+    const [responsibleName, setResponsibleName] = React.useState("");
+    const [responsibilityDepartment, setResponsibilityDepartment] = React.useState("");
+    const [projectDescription, setProjectDescription] = React.useState("");
+    const [responsibilitySearchTerm, setResponsibilitySearchTerm] = React.useState("");
+    const [responsibilityQuantity, setResponsibilityQuantity] = React.useState(1);
+    const [responsibilityItems, setResponsibilityItems] = React.useState<RequestedItem[]>([]);
+    const [isConfirmDialogOpen, setIsConfirmDialogOpen] = React.useState(false);
     
     const consumableItems = allProducts.filter(p => p.type === 'consumo');
+    const permanentItems = allProducts.filter(p => p.type === 'permanente');
 
-    const handleAddItem = () => {
+    const handleAddItem = (type: 'consumption' | 'responsibility') => {
+        const searchTerm = type === 'consumption' ? consumptionSearchTerm : responsibilitySearchTerm;
+        const quantity = type === 'consumption' ? consumptionQuantity : responsibilityQuantity;
+        const items = type === 'consumption' ? consumableItems : permanentItems;
+        const setRequestedItemsFn = type === 'consumption' ? setRequestedItems : setResponsibilityItems;
+
         if (!searchTerm.trim()) {
             toast({ title: "Erro", description: "Por favor, busque e selecione um item.", variant: "destructive" });
             return;
         }
 
-        const item = consumableItems.find(i => 
+        const item = items.find(i => 
             i.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
             i.code.toLowerCase().includes(searchTerm.toLowerCase())
         );
 
         if (!item) {
-            toast({ title: "Item não encontrado", description: "O item buscado não existe no estoque de consumo.", variant: "destructive" });
+            toast({ title: "Item não encontrado", description: `O item buscado não existe no estoque de ${type === 'consumption' ? 'consumo' : 'permanente'}.`, variant: "destructive" });
             return;
         }
 
@@ -81,7 +109,7 @@ export default function ExitPage() {
             return;
         }
 
-        setRequestedItems(prev => {
+        setRequestedItemsFn(prev => {
             const existing = prev.find(i => i.id === item.id);
             if (existing) {
                 const newQuantity = existing.quantity + quantity;
@@ -94,12 +122,18 @@ export default function ExitPage() {
             return [...prev, { id: item.id, name: item.name, quantity, unit: item.unit }];
         });
 
-        setSearchTerm("");
-        setQuantity(1);
+        if (type === 'consumption') {
+            setConsumptionSearchTerm("");
+            setConsumptionQuantity(1);
+        } else {
+            setResponsibilitySearchTerm("");
+            setResponsibilityQuantity(1);
+        }
     };
 
-    const handleRemoveItem = (itemId: string) => {
-        setRequestedItems(prev => prev.filter(item => item.id !== itemId));
+    const handleRemoveItem = (itemId: string, type: 'consumption' | 'responsibility') => {
+        const setRequestedItemsFn = type === 'consumption' ? setRequestedItems : setResponsibilityItems;
+        setRequestedItemsFn(prev => prev.filter(item => item.id !== itemId));
     };
 
     const handleFinalizeIssue = () => {
@@ -122,7 +156,7 @@ export default function ExitPage() {
             });
         });
         
-        toast({ title: "Saída Registrada!", description: "A saída de materiais foi registrada com sucesso." });
+        toast({ title: "Saída Registrada!", description: "A saída de materiais de consumo foi registrada com sucesso." });
 
         // Reset form
         setRequestDate(new Date());
@@ -131,12 +165,47 @@ export default function ExitPage() {
         setPurpose("");
         setRequestedItems([]);
     };
+    
+    const handleFinalizeResponsibility = () => {
+        if (responsibilityItems.length === 0) {
+            toast({ title: "Nenhum item adicionado", description: "Adicione pelo menos um item para gerar o termo.", variant: "destructive" });
+            return;
+        }
+        setIsConfirmDialogOpen(true);
+    };
+    
+    const confirmFinalizeResponsibility = () => {
+        responsibilityItems.forEach(item => {
+            const productIndex = allProducts.findIndex(p => p.id === item.id);
+            if (productIndex !== -1) {
+                allProducts[productIndex].quantity -= item.quantity;
+            }
+            addMovement({
+                productId: item.id,
+                date: new Date().toISOString(),
+                type: 'Saída',
+                quantity: item.quantity,
+                responsible: responsibleName || 'sdpinho29' // Mock user
+            });
+        });
+
+        toast({ title: "Termo de Responsabilidade Gerado!", description: "A saída de material permanente foi registrada com sucesso." });
+
+        // Reset form
+        setResponsibilityDate(new Date());
+        setResponsibleName("");
+        setResponsibilityDepartment("");
+        setProjectDescription("");
+        setResponsibilityItems([]);
+        setIsConfirmDialogOpen(false);
+    };
+
 
     return (
         <div className="flex flex-col gap-6">
             <h1 className="text-3xl font-bold tracking-tight">Registrar Saída de Materiais</h1>
 
-            <Tabs defaultValue="consumption" className="w-full">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                 <TabsList className="grid w-full grid-cols-2 max-w-md">
                     <TabsTrigger value="consumption">Requisição de Consumo</TabsTrigger>
                     <TabsTrigger value="responsibility">Termo de Responsabilidade</TabsTrigger>
@@ -183,12 +252,12 @@ export default function ExitPage() {
                                         <CardTitle>Itens Solicitados</CardTitle>
                                         <div className="flex flex-col md:flex-row items-end gap-2 pt-4">
                                             <div className="flex-1 w-full">
-                                                <label htmlFor="search-item" className="text-sm font-medium">Buscar Item de Consumo</label>
+                                                <label htmlFor="search-item-consumption" className="text-sm font-medium">Buscar Item de Consumo</label>
                                                 <Input 
-                                                    id="search-item" 
+                                                    id="search-item-consumption" 
                                                     placeholder="Digite para buscar..." 
-                                                    value={searchTerm} 
-                                                    onChange={e => setSearchTerm(e.target.value)}
+                                                    value={consumptionSearchTerm} 
+                                                    onChange={e => setConsumptionSearchTerm(e.target.value)}
                                                     list="consumable-items"
                                                 />
                                                 <datalist id="consumable-items">
@@ -196,10 +265,10 @@ export default function ExitPage() {
                                                 </datalist>
                                             </div>
                                             <div className="w-full md:w-24">
-                                                <label htmlFor="quantity" className="text-sm font-medium">Qtd.</label>
-                                                <Input id="quantity" type="number" value={quantity} onChange={e => setQuantity(Number(e.target.value))} min="1" />
+                                                <label htmlFor="quantity-consumption" className="text-sm font-medium">Qtd.</label>
+                                                <Input id="quantity-consumption" type="number" value={consumptionQuantity} onChange={e => setConsumptionQuantity(Number(e.target.value))} min="1" />
                                             </div>
-                                            <Button onClick={handleAddItem} className="w-full md:w-auto">Adicionar</Button>
+                                            <Button onClick={() => handleAddItem('consumption')} className="w-full md:w-auto">Adicionar</Button>
                                         </div>
                                     </CardHeader>
                                     <CardContent>
@@ -225,7 +294,7 @@ export default function ExitPage() {
                                                                 <TableCell className="font-medium">{item.name}</TableCell>
                                                                 <TableCell className="text-right">{`${item.quantity} ${item.unit}`}</TableCell>
                                                                 <TableCell className="text-center">
-                                                                    <Button variant="ghost" size="icon" className="text-red-600 hover:bg-red-100" onClick={() => handleRemoveItem(item.id)}>
+                                                                    <Button variant="ghost" size="icon" className="text-red-600 hover:bg-red-100" onClick={() => handleRemoveItem(item.id, 'consumption')}>
                                                                         <Trash2 className="h-4 w-4" />
                                                                     </Button>
                                                                 </TableCell>
@@ -239,7 +308,7 @@ export default function ExitPage() {
                                 </Card>
                             </div>
                             <div className="flex justify-end mt-6">
-                                <Button size="lg" onClick={handleFinalizeIssue}>
+                                <Button size="lg" onClick={handleFinalizeIssue} disabled={requestedItems.length === 0}>
                                     Finalizar Saída
                                 </Button>
                             </div>
@@ -248,16 +317,138 @@ export default function ExitPage() {
                 </TabsContent>
                 <TabsContent value="responsibility">
                      <Card>
-                        <CardHeader>
-                            <CardTitle>Termo de Responsabilidade</CardTitle>
-                            <CardDescription>
-                                Esta funcionalidade ainda será implementada.
-                            </CardDescription>
-                        </CardHeader>
+                        <CardContent className="pt-6">
+                            <div className="space-y-6">
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                    <div className="space-y-2">
+                                        <label htmlFor="responsibility-date" className="text-sm font-medium">Data da Solicitação</label>
+                                        <Popover>
+                                            <PopoverTrigger asChild>
+                                                <Button
+                                                    id="responsibility-date"
+                                                    variant={"outline"}
+                                                    className={cn("w-full justify-start text-left font-normal", !responsibilityDate && "text-muted-foreground")}
+                                                >
+                                                    <CalendarIcon className="mr-2 h-4 w-4" />
+                                                    {responsibilityDate ? format(responsibilityDate, "dd/MM/yyyy") : <span>Selecione uma data</span>}
+                                                </Button>
+                                            </PopoverTrigger>
+                                            <PopoverContent className="w-auto p-0">
+                                                <Calendar mode="single" selected={responsibilityDate} onSelect={setResponsibilityDate} initialFocus locale={ptBR} />
+                                            </PopoverContent>
+                                        </Popover>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label htmlFor="responsible-name" className="text-sm font-medium">Nome do Responsável</label>
+                                        <Input id="responsible-name" value={responsibleName} onChange={e => setResponsibleName(e.target.value)} />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label htmlFor="responsibility-department" className="text-sm font-medium">Setor/Departamento</label>
+                                        <Input id="responsibility-department" value={responsibilityDepartment} onChange={e => setResponsibilityDepartment(e.target.value)} />
+                                    </div>
+                                </div>
+                                <div className="space-y-2">
+                                    <label htmlFor="project-description" className="text-sm font-medium">Descrição de Uso ou Projeto</label>
+                                    <Textarea id="project-description" value={projectDescription} onChange={e => setProjectDescription(e.target.value)} />
+                                </div>
+
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle>Itens Sob Responsabilidade</CardTitle>
+                                        <div className="flex flex-col md:flex-row items-end gap-2 pt-4">
+                                            <div className="flex-1 w-full">
+                                                <label htmlFor="search-item-responsibility" className="text-sm font-medium">Buscar Item Permanente</label>
+                                                <Input 
+                                                    id="search-item-responsibility" 
+                                                    placeholder="Digite para buscar por item permanente..." 
+                                                    value={responsibilitySearchTerm} 
+                                                    onChange={e => setResponsibilitySearchTerm(e.target.value)}
+                                                    list="permanent-items"
+                                                />
+                                                <datalist id="permanent-items">
+                                                    {permanentItems.map(item => <option key={item.id} value={item.name} />)}
+                                                </datalist>
+                                            </div>
+                                            <div className="w-full md:w-24">
+                                                <label htmlFor="quantity-responsibility" className="text-sm font-medium">Qtd.</label>
+                                                <Input id="quantity-responsibility" type="number" value={responsibilityQuantity} onChange={e => setResponsibilityQuantity(Number(e.target.value))} min="1" />
+                                            </div>
+                                            <Button onClick={() => handleAddItem('responsibility')} className="w-full md:w-auto">Adicionar</Button>
+                                        </div>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <div className="border rounded-md overflow-x-auto">
+                                            <Table>
+                                                <TableHeader>
+                                                    <TableRow>
+                                                        <TableHead>Item</TableHead>
+                                                        <TableHead className="w-[100px] text-right">Qtd</TableHead>
+                                                        <TableHead className="w-[100px] text-center">Ação</TableHead>
+                                                    </TableRow>
+                                                </TableHeader>
+                                                <TableBody>
+                                                    {responsibilityItems.length === 0 ? (
+                                                        <TableRow>
+                                                            <TableCell colSpan={3} className="text-center text-muted-foreground">
+                                                                Nenhum item adicionado.
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    ) : (
+                                                        responsibilityItems.map(item => (
+                                                            <TableRow key={item.id}>
+                                                                <TableCell className="font-medium">{item.name}</TableCell>
+                                                                <TableCell className="text-right">{`${item.quantity} ${item.unit}`}</TableCell>
+                                                                <TableCell className="text-center">
+                                                                    <Button variant="ghost" size="icon" className="text-red-600 hover:bg-red-100" onClick={() => handleRemoveItem(item.id, 'responsibility')}>
+                                                                        <Trash2 className="h-4 w-4" />
+                                                                    </Button>
+                                                                </TableCell>
+                                                            </TableRow>
+                                                        ))
+                                                    )}
+                                                </TableBody>
+                                            </Table>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            </div>
+                            <div className="flex justify-end mt-6">
+                                <Button size="lg" onClick={handleFinalizeResponsibility} disabled={responsibilityItems.length === 0}>
+                                    Gerar Termo e Finalizar
+                                </Button>
+                            </div>
+                        </CardContent>
                     </Card>
                 </TabsContent>
             </Tabs>
+             {isConfirmDialogOpen && (
+                <AlertDialog open={isConfirmDialogOpen} onOpenChange={setIsConfirmDialogOpen}>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>Confirmar Termo de Responsabilidade</AlertDialogTitle>
+                            <AlertDialogDescription>
+                                Você está prestes a registrar a saída dos seguintes itens sob sua responsabilidade:
+                                <ul className="list-disc pl-5 mt-2">
+                                    {responsibilityItems.map(item => (
+                                        <li key={item.id}>{item.quantity}x {item.name}</li>
+                                    ))}
+                                </ul>
+                                 Ao confirmar, você se declara responsável pela guarda e conservação dos mesmos.
+                                 Esta ação não poderá ser desfeita.
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction onClick={confirmFinalizeResponsibility}>
+                                Confirmar e Gerar Termo
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
+            )}
         </div>
     );
 }
 
+
+    
