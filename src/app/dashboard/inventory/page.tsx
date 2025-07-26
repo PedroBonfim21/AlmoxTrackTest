@@ -43,64 +43,7 @@ import { AddItemSheet } from "./components/add-item-sheet";
 import { EditItemSheet } from "./components/edit-item-sheet";
 import { MovementsSheet } from "./components/movements-sheet";
 import { useToast } from "@/hooks/use-toast";
-
-const initialProducts = [
-  {
-    id: "1",
-    image: "https://placehold.co/40x40.png",
-    name: "Caneta Azul",
-    code: "001-25",
-    patrimony: "N/A",
-    type: "consumo",
-    quantity: 92,
-    unit: "und",
-    category: "Escritório",
-  },
-  {
-    id: "2",
-    image: "https://placehold.co/40x40.png",
-    name: "Caneta Preta",
-    code: "002-25",
-    patrimony: "N/A",
-    type: "consumo",
-    quantity: 63,
-    unit: "und",
-    category: "Escritório",
-  },
-  {
-    id: "3",
-    image: "https://placehold.co/40x40.png",
-    name: "Caneta Vermelha",
-    code: "003-25",
-    patrimony: "N/A",
-    type: "consumo",
-    quantity: 19,
-    unit: "und",
-    category: "Escritório",
-  },
-  {
-    id: "4",
-    image: "https://placehold.co/40x40.png",
-    name: "Papel A4",
-    code: "005-25",
-    patrimony: "N/A",
-    type: "consumo",
-    quantity: 11,
-    unit: "Resma",
-    category: "Escritório",
-  },
-  {
-    id: "5",
-    image: "https://placehold.co/40x40.png",
-    name: "Quadro",
-    code: "004-25",
-    patrimony: "123456",
-    type: "permanente",
-    quantity: 1,
-    unit: "und",
-    category: "Mobiliário",
-  },
-];
+import { products as initialProducts } from "@/lib/mock-data";
 
 type Product = typeof initialProducts[0] & { imagePreview?: string };
 

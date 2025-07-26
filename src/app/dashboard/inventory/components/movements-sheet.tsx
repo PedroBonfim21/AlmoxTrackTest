@@ -4,6 +4,7 @@ import * as React from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { movements as allMovements } from "@/lib/mock-data";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -25,14 +26,6 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 
-const mockMovements = [
-    { id: '1', date: '2024-05-20T07:00:00Z', type: 'Entrada', quantity: 50, responsible: 'João Silva' },
-    { id: '2', date: '2024-05-21T11:30:00Z', type: 'Saída', quantity: 10, responsible: 'Maria Oliveira' },
-    { id: '3', date: '2024-05-22T06:15:00Z', type: 'Saída', quantity: 5, responsible: 'Carlos Pereira' },
-    { id: '4', date: '2024-05-23T08:00:00Z', type: 'Entrada', quantity: 20, responsible: 'João Silva' },
-    { id: '5', date: '2024-05-24T13:45:00Z', type: 'Devolução', quantity: 2, responsible: 'Ana Costa' },
-];
-
 const getBadgeVariant = (type: string) => {
     switch (type) {
       case 'Entrada':
@@ -53,12 +46,13 @@ interface MovementsSheetProps {
 }
 
 export function MovementsSheet({ isOpen, onOpenChange, item }: MovementsSheetProps) {
-  
+  const [itemMovements, setItemMovements] = React.useState<any[]>([]);
+
   React.useEffect(() => {
-    if (!isOpen) {
-     // Optional: Reset any state if needed when sheet closes
+    if (isOpen && item) {
+      setItemMovements(allMovements.filter(m => m.productId === item.id));
     }
-  }, [isOpen]);
+  }, [isOpen, item]);
 
   return (
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
@@ -81,18 +75,24 @@ export function MovementsSheet({ isOpen, onOpenChange, item }: MovementsSheetPro
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {mockMovements.map((movement) => (
-                    <TableRow key={movement.id}>
-                      <TableCell>{format(new Date(movement.date), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className={cn('font-normal', getBadgeVariant(movement.type))}>
-                            {movement.type}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right font-medium">{movement.quantity}</TableCell>
-                      <TableCell>{movement.responsible}</TableCell>
+                  {itemMovements.length > 0 ? (
+                    itemMovements.map((movement) => (
+                      <TableRow key={movement.id}>
+                        <TableCell>{format(new Date(movement.date), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className={cn('font-normal', getBadgeVariant(movement.type))}>
+                              {movement.type}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right font-medium">{movement.quantity}</TableCell>
+                        <TableCell>{movement.responsible}</TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-center text-muted-foreground">Nenhuma movimentação encontrada para este item.</TableCell>
                     </TableRow>
-                  ))}
+                  )}
                 </TableBody>
               </Table>
             </div>

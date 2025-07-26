@@ -43,14 +43,8 @@ import { AddItemSheet } from "../inventory/components/add-item-sheet";
 import { AdminAuthDialog } from "./components/admin-auth-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { products as allProducts, movements as allMovements, addMovement } from "@/lib/mock-data";
 
-// Mock data - replace with actual data fetching
-const mockInventoryItems = [
-  { id: "1", name: "Caneta Azul", code: "001-25", unit: "und" },
-  { id: "2", name: "Caneta Preta", code: "002-25", unit: "und" },
-  { id: "3", name: "Papel A4", code: "005-25", unit: "Resma" },
-  { id: "4", name: "Quadro", code: "004-25", unit: "und" },
-];
 
 type ReceivedItem = {
     id: string;
@@ -69,7 +63,7 @@ export default function EntryPage() {
     const [invoice, setInvoice] = React.useState("");
     
     const [searchTerm, setSearchTerm] = React.useState("");
-    const [searchResults, setSearchResults] = React.useState(mockInventoryItems);
+    const [searchResults, setSearchResults] = React.useState(allProducts);
     const [quantity, setQuantity] = React.useState(1);
     const [receivedItems, setReceivedItems] = React.useState<ReceivedItem[]>([]);
     
@@ -82,7 +76,7 @@ export default function EntryPage() {
 
     React.useEffect(() => {
         const lowerCaseSearchTerm = searchTerm.toLowerCase();
-        const results = mockInventoryItems.filter(item =>
+        const results = allProducts.filter(item =>
             item.name.toLowerCase().includes(lowerCaseSearchTerm) ||
             item.code.toLowerCase().includes(lowerCaseSearchTerm)
         );
@@ -93,7 +87,7 @@ export default function EntryPage() {
         if (!searchTerm) return;
         
         const lowerCaseSearchTerm = searchTerm.toLowerCase();
-        const existingItem = mockInventoryItems.find(item => 
+        const existingItem = allProducts.find(item => 
             item.name.toLowerCase() === lowerCaseSearchTerm || 
             item.code.toLowerCase() === lowerCaseSearchTerm
         );
@@ -135,20 +129,26 @@ export default function EntryPage() {
     };
 
     const handleItemAdded = (newItemData: any) => {
-        // This function would typically add the item to the main inventory state/database
         const newItem = {
-            id: (mockInventoryItems.length + 1).toString(),
+            id: (allProducts.length + 1).toString(),
             name: newItemData.name,
-            code: newItemData.itemCode || `new-${mockInventoryItems.length + 1}`,
+            code: newItemData.itemCode || `new-${allProducts.length + 1}`,
             unit: newItemData.unit,
+            patrimony: newItemData.materialType === 'permanente' ? newItemData.patrimony : 'N/A',
+            type: newItemData.materialType,
+            quantity: newItemData.initialQuantity,
+            category: newItemData.category,
+            image: "https://placehold.co/40x40.png"
         };
-        mockInventoryItems.push(newItem); // temporary mock update
+        allProducts.push(newItem); //
         toast({
             title: "Item Adicionado!",
             description: `${newItem.name} foi adicionado ao inventário.`,
         });
-        // Immediately add it to the current entry list
-        handleAddToList(newItem);
+        
+        if (newItem.quantity > 0) {
+            setReceivedItems(prev => [...prev, { id: newItem.id, name: newItem.name, quantity: newItem.quantity, unit: newItem.unit }]);
+        }
     };
 
     const handleAuthSuccess = () => {
@@ -166,7 +166,19 @@ export default function EntryPage() {
             return;
         }
         
-        // Logic to save the entry to the database would go here
+        receivedItems.forEach(item => {
+            const productIndex = allProducts.findIndex(p => p.id === item.id);
+            if (productIndex !== -1) {
+                allProducts[productIndex].quantity += item.quantity;
+            }
+            addMovement({
+                productId: item.id,
+                date: new Date().toISOString(),
+                type: 'Entrada',
+                quantity: item.quantity,
+                responsible: 'sdpinho29' 
+            });
+        });
         
         toast({
             title: "Entrada Registrada!",
