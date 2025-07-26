@@ -77,8 +77,10 @@ export default function EntryPage() {
     const [isAuthDialogOpen, setIsAuthDialogOpen] = React.useState(false);
     
     React.useEffect(() => {
+        const lowerCaseSearchTerm = searchTerm.toLowerCase();
         const results = mockInventoryItems.filter(item =>
-            item.name.toLowerCase().includes(searchTerm.toLowerCase())
+            item.name.toLowerCase().includes(lowerCaseSearchTerm) ||
+            item.code.toLowerCase().includes(lowerCaseSearchTerm)
         );
         setSearchResults(results);
     }, [searchTerm]);
@@ -86,7 +88,11 @@ export default function EntryPage() {
     const handleSearchOrAddItem = () => {
         if (!searchTerm) return;
         
-        const existingItem = mockInventoryItems.find(item => item.name.toLowerCase() === searchTerm.toLowerCase());
+        const lowerCaseSearchTerm = searchTerm.toLowerCase();
+        const existingItem = mockInventoryItems.find(item => 
+            item.name.toLowerCase() === lowerCaseSearchTerm || 
+            item.code.toLowerCase() === lowerCaseSearchTerm
+        );
         
         if (existingItem) {
             handleAddToList(existingItem);
@@ -231,7 +237,7 @@ export default function EntryPage() {
                                 <label htmlFor="search-item" className="text-sm font-medium">Buscar Item</label>
                                 <Input 
                                     id="search-item" 
-                                    placeholder="Digite para buscar..." 
+                                    placeholder="Digite para buscar por nome ou código..." 
                                     value={searchTerm} 
                                     onChange={(e) => setSearchTerm(e.target.value)}
                                     list="inventory-items"
