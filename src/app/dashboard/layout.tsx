@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import * as React from "react";
 import {
   CircleUser,
   FileText,
@@ -40,7 +41,12 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { AdminSyncAuthDialog } from "./components/admin-sync-auth-dialog";
 import { usePathname } from "next/navigation";
+import { useToast } from "@/hooks/use-toast";
+
+// Mock user role - 'Admin' or 'Operator'
+const currentUserRole = "Admin";
 
 export default function DashboardLayout({
   children,
@@ -48,6 +54,8 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const { toast } = useToast();
+  const [isAuthDialogOpen, setIsAuthDialogOpen] = React.useState(false);
 
   const navItems = [
     { href: "/dashboard", icon: LayoutDashboard, label: "Painel" },
@@ -56,6 +64,14 @@ export default function DashboardLayout({
     { href: "/dashboard/exit", icon: ArrowLeftFromLine, label: "Saída" },
     { href: "/dashboard/returns", icon: ChevronsLeftRight, label: "Devolução" },
   ];
+
+  const handleSyncSuccess = () => {
+    toast({
+      title: "Autenticação bem-sucedida!",
+      description: "A funcionalidade de sincronização de planilhas já pode ser acessada.",
+    });
+    // Here you would typically navigate to the sync page or open the feature
+  };
 
   return (
     <SidebarProvider>
@@ -82,18 +98,17 @@ export default function DashboardLayout({
                 </SidebarMenuButton>
               </SidebarMenuItem>
             ))}
-             <SidebarMenuItem>
+            {currentUserRole === 'Admin' && (
+              <SidebarMenuItem>
                 <SidebarMenuButton
-                  asChild
-                  isActive={pathname === "#"}
+                  onClick={() => setIsAuthDialogOpen(true)}
                   tooltip={"Sincronizar Planilha"}
                 >
-                  <Link href="#">
-                    <FileCog />
-                    <span>{"Sincronizar Planilha"}</span>
-                  </Link>
+                  <FileCog />
+                  <span>{"Sincronizar Planilha"}</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
+            )}
           </SidebarMenu>
         </SidebarContent>
         <SidebarSeparator />
@@ -165,6 +180,11 @@ export default function DashboardLayout({
         </header>
         <main className="flex-1 p-4 sm:px-6 sm:py-6">{children}</main>
       </SidebarInset>
+      <AdminSyncAuthDialog
+        isOpen={isAuthDialogOpen}
+        onOpenChange={setIsAuthDialogOpen}
+        onAuthSuccess={handleSyncSuccess}
+      />
     </SidebarProvider>
   );
 }
