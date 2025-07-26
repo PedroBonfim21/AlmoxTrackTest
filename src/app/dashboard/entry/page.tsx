@@ -5,6 +5,7 @@ import { PlusCircle, Search, Calendar as CalendarIcon, Trash2 } from "lucide-rea
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { DateRange } from "react-day-picker";
+import Image from "next/image";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -45,6 +46,7 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { products as allProducts, movements as allMovements, addMovement } from "@/lib/mock-data";
 
+type Product = (typeof allProducts)[0];
 
 type ReceivedItem = {
     id: string;
@@ -63,7 +65,8 @@ export default function EntryPage() {
     const [invoice, setInvoice] = React.useState("");
     
     const [searchTerm, setSearchTerm] = React.useState("");
-    const [searchResults, setSearchResults] = React.useState(allProducts);
+    const [searchResults, setSearchResults] = React.useState<Product[]>([]);
+    const [isSearchOpen, setIsSearchOpen] = React.useState(false);
     const [quantity, setQuantity] = React.useState(1);
     const [receivedItems, setReceivedItems] = React.useState<ReceivedItem[]>([]);
     
@@ -75,13 +78,24 @@ export default function EntryPage() {
     }, []);
 
     React.useEffect(() => {
-        const lowerCaseSearchTerm = searchTerm.toLowerCase();
-        const results = allProducts.filter(item =>
-            item.name.toLowerCase().includes(lowerCaseSearchTerm) ||
-            item.code.toLowerCase().includes(lowerCaseSearchTerm)
-        );
-        setSearchResults(results);
+       if (searchTerm.trim()) {
+            const lowerCaseSearchTerm = searchTerm.toLowerCase();
+            const results = allProducts.filter(item =>
+                item.name.toLowerCase().includes(lowerCaseSearchTerm) ||
+                item.code.toLowerCase().includes(lowerCaseSearchTerm)
+            );
+            setSearchResults(results);
+            setIsSearchOpen(true);
+       } else {
+            setSearchResults([]);
+            setIsSearchOpen(false);
+       }
     }, [searchTerm]);
+
+    const handleSelectSearchItem = (item: Product) => {
+        setSearchTerm(item.name);
+        setIsSearchOpen(false);
+    }
     
     const handleSearchOrAddItem = () => {
         if (!searchTerm) return;
@@ -248,25 +262,45 @@ export default function EntryPage() {
                 <Card>
                     <CardHeader>
                         <CardTitle>Itens Recebidos</CardTitle>
-                        <div className="flex items-end gap-2 pt-4">
-                            <div className="flex-1">
+                        <div className="flex flex-col md:flex-row items-end gap-2 pt-4">
+                            <div className="flex-1 w-full relative">
                                 <label htmlFor="search-item" className="text-sm font-medium">Buscar Item</label>
                                 <Input 
                                     id="search-item" 
                                     placeholder="Digite para buscar por nome ou código..." 
                                     value={searchTerm} 
                                     onChange={(e) => setSearchTerm(e.target.value)}
-                                    list="inventory-items"
+                                    autoComplete="off"
                                 />
-                                <datalist id="inventory-items">
-                                    {searchResults.map(item => <option key={item.id} value={item.name} />)}
-                                </datalist>
+                                {isSearchOpen && searchResults.length > 0 && (
+                                    <div className="absolute z-10 w-full mt-1 bg-background border border-border rounded-md shadow-lg max-h-60 overflow-y-auto">
+                                        {searchResults.map(item => (
+                                            <div 
+                                                key={item.id}
+                                                className="flex items-center gap-4 p-2 cursor-pointer hover:bg-muted"
+                                                onClick={() => handleSelectSearchItem(item)}
+                                            >
+                                                <Image 
+                                                    src={item.image}
+                                                    alt={item.name}
+                                                    width={40}
+                                                    height={40}
+                                                    className="rounded-md object-cover aspect-square"
+                                                />
+                                                <div>
+                                                    <div className="font-medium">{item.name}</div>
+                                                    <div className="text-sm text-muted-foreground">{item.code}</div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
-                            <div className="w-24">
+                            <div className="w-full md:w-24">
                                <label htmlFor="quantity" className="text-sm font-medium">Qtd.</label>
                                <Input id="quantity" type="number" value={quantity} onChange={e => setQuantity(Number(e.target.value))} min="1" />
                             </div>
-                            <Button onClick={handleSearchOrAddItem}>Adicionar</Button>
+                            <Button onClick={handleSearchOrAddItem} className="w-full md:w-auto">Adicionar</Button>
                         </div>
                     </CardHeader>
                     <CardContent>
