@@ -4,7 +4,9 @@ import * as React from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { DateRange } from "react-day-picker";
-import { Calendar as CalendarIcon, FileDown } from "lucide-react";
+import { Calendar as CalendarIcon, FileDown, ArrowUpRight, ArrowDownLeft, Package, Building, BarChartHorizontal } from "lucide-react";
+import { Bar, BarChart, Line, LineChart, ResponsiveContainer, XAxis, YAxis, Tooltip, Legend, CartesianGrid, Pie, PieChart, Cell } from "recharts";
+
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import {
@@ -13,146 +15,297 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { Badge } from "@/components/ui/badge";
+import { products, movements as allMovements } from "@/lib/mock-data";
 
-const movements = [
-  { date: "2024-05-01", product: "Cimento Votoran 50kg", type: "Entrada", quantity: 100, responsible: "João Silva" },
-  { date: "2024-05-02", product: "Tijolo Baiano 9 furos", type: "Saída", quantity: 500, responsible: "Maria Oliveira" },
-  { date: "2024-05-03", product: "Areia Média (metro)", type: "Entrada", quantity: 10, responsible: "João Silva" },
-  { date: "2024-05-04", product: "Vergalhão 3/8", type: "Saída", quantity: 20, responsible: "Carlos Pereira" },
-  { date: "2024-05-05", product: "Cimento Votoran 50kg", type: "Saída", quantity: 30, responsible: "Maria Oliveira" },
-  { date: "2024-05-06", product: "Tinta Branca (Lata 18L)", type: "Entrada", quantity: 15, responsible: "João Silva" },
-  { date: "2024-05-07", product: "Cano PVC 100mm", type: "Saída", quantity: 40, responsible: "Ana Costa" },
-];
+const COLORS = ["#4553a4", "#00acad", "#ffc20e"];
 
 export default function DashboardPage() {
-  const [date, setDate] = React.useState<DateRange | undefined>(undefined);
+  const [date, setDate] = React.useState<DateRange | undefined>({
+    from: new Date(new Date().setMonth(new Date().getMonth() - 1)),
+    to: new Date(),
+  });
+  
+  const [filteredMovements, setFilteredMovements] = React.useState(allMovements);
 
   React.useEffect(() => {
-    setDate({
-      from: new Date(2024, 4, 1),
-      to: new Date(),
+    // Initial filtering based on default date range
+    if (date?.from && date?.to) {
+        const filtered = allMovements.filter(m => {
+            const movementDate = new Date(m.date);
+            return movementDate >= date.from! && movementDate <= date.to!;
+        });
+        setFilteredMovements(filtered);
+    }
+  }, [date]);
+
+
+  const totalMovements = filteredMovements.length;
+  const totalEntries = filteredMovements.filter(m => m.type === 'Entrada').length;
+  const totalExits = filteredMovements.filter(m => m.type === 'Saída').length;
+  
+  const mostMovedItem = React.useMemo(() => {
+    if (filteredMovements.length === 0) return { name: 'N/A', count: 0 };
+    const counts = filteredMovements.reduce((acc, mov) => {
+        acc[mov.productId] = (acc[mov.productId] || 0) + 1;
+        return acc;
+    }, {} as Record<string, number>);
+    const mostMovedId = Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b);
+    const product = products.find(p => p.id === mostMovedId);
+    return { name: product?.name || 'N/A', count: counts[mostMovedId] };
+  }, [filteredMovements]);
+  
+  const topSector = React.useMemo(() => {
+      if (filteredMovements.length === 0) return { name: 'N/A', count: 0 };
+      const exitMovements = filteredMovements.filter(m => m.type === 'Saída' && m.department);
+      if (exitMovements.length === 0) return { name: 'N/A', count: 0 };
+      const counts = exitMovements.reduce((acc, mov) => {
+        acc[mov.department!] = (acc[mov.department!] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+      if (Object.keys(counts).length === 0) return { name: 'N/A', count: 0 };
+      const topSectorName = Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b);
+      return { name: topSectorName, count: counts[topSectorName]};
+  }, [filteredMovements]);
+
+
+  const movementsByDay = React.useMemo(() => {
+    const sortedMovements = [...filteredMovements].sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    const byDay = sortedMovements.reduce((acc, mov) => {
+        const day = format(new Date(mov.date), 'dd/MM');
+        if (!acc[day]) {
+            acc[day] = { date: day, Entrada: 0, Saída: 0 };
+        }
+        acc[day][mov.type]++;
+        return acc;
+    }, {} as Record<string, {date: string, Entrada: number, Saída: number}>);
+    return Object.values(byDay);
+  }, [filteredMovements]);
+  
+  const top10Items = React.useMemo(() => {
+    const counts = filteredMovements.reduce((acc, mov) => {
+        acc[mov.productId] = (acc[mov.productId] || 0) + 1;
+        return acc;
+    }, {} as Record<string, number>);
+
+    return Object.entries(counts)
+        .map(([productId, count]) => ({
+            name: products.find(p => p.id === productId)?.name || 'Desconhecido',
+            count,
+        }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 10);
+  }, [filteredMovements]);
+  
+  const handleExport = () => {
+    let csvContent = "data:text/csv;charset=utf-8,";
+    csvContent += "Data,Produto,Tipo,Quantidade,Responsavel,Setor\n"; // Header
+
+    filteredMovements.forEach(movement => {
+        const product = products.find(p => p.id === movement.productId);
+        const row = [
+            format(new Date(movement.date), "yyyy-MM-dd"),
+            product?.name || 'N/A',
+            movement.type,
+            movement.quantity,
+            movement.responsible,
+            movement.department || 'N/A'
+        ].join(",");
+        csvContent += row + "\n";
     });
-  }, []);
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "relatorio_movimentacoes.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+};
+
 
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between space-y-2">
         <h1 className="text-3xl font-bold tracking-tight">
-          Painel
+          Painel de Controle
         </h1>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Filtros de Relatório</CardTitle>
-          <CardDescription>
-            Selecione o período para gerar o relatório de movimentações.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                id="date"
-                variant={"outline"}
-                className={cn(
-                  "w-full sm:w-[300px] justify-start text-left font-normal",
-                  !date && "text-muted-foreground"
-                )}
-              >
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {date?.from ? (
-                  date.to ? (
-                    <>
-                      {format(date.from, "P", { locale: ptBR })} -{" "}
-                      {format(date.to, "P", { locale: ptBR })}
-                    </>
-                  ) : (
-                    format(date.from, "P", { locale: ptBR })
-                  )
-                ) : (
-                  <span>Selecione uma data</span>
-                )}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                initialFocus
-                mode="range"
-                defaultMonth={date?.from}
-                selected={date}
-                onSelect={setDate}
-                numberOfMonths={2}
-                locale={ptBR}
-              />
-            </PopoverContent>
-          </Popover>
-          <Button variant="accent" className="w-full sm:w-auto">
-            Gerar Relatório
-          </Button>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between space-x-0 sm:space-x-2 space-y-2 sm:space-y-0">
-          <div>
-            <CardTitle>Relatório de Movimentações</CardTitle>
-            <CardDescription>
-              Exibindo as últimas movimentações no período selecionado.
-            </CardDescription>
-          </div>
-           <Button variant="outline" className="w-full sm:w-auto">
+         <Button variant="outline" className="w-full sm:w-auto" onClick={handleExport}>
             <FileDown className="mr-2 h-4 w-4" />
             Exportar para CSV
-          </Button>
+        </Button>
+      </div>
+
+       <Card>
+        <CardHeader>
+          <CardTitle>Filtros</CardTitle>
+          <CardDescription>
+            Use os filtros para analisar os dados de movimentações.
+          </CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="border rounded-md overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[120px]">Data</TableHead>
-                  <TableHead>Produto</TableHead>
-                  <TableHead className="w-[120px]">Tipo</TableHead>
-                  <TableHead className="text-right w-[120px]">Quantidade</TableHead>
-                  <TableHead className="w-[180px] hidden md:table-cell">Responsável</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {movements.map((movement, index) => (
-                  <TableRow key={index}>
-                    <TableCell>{format(new Date(movement.date), "dd/MM/yyyy")}</TableCell>
-                    <TableCell className="font-medium">{movement.product}</TableCell>
-                    <TableCell>
-                      <Badge variant={movement.type === 'Entrada' ? 'secondary' : 'outline'} className={cn(movement.type === 'Entrada' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800')}>
-                        {movement.type}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">{movement.quantity}</TableCell>
-                    <TableCell className="hidden md:table-cell">{movement.responsible}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+        <CardContent className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+            <Popover>
+                <PopoverTrigger asChild>
+                <Button
+                    id="date"
+                    variant={"outline"}
+                    className={cn(
+                    "w-full justify-start text-left font-normal",
+                    !date && "text-muted-foreground"
+                    )}
+                >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {date?.from ? (
+                    date.to ? (
+                        <>
+                        {format(date.from, "P", { locale: ptBR })} -{" "}
+                        {format(date.to, "P", { locale: ptBR })}
+                        </>
+                    ) : (
+                        format(date.from, "P", { locale: ptBR })
+                    )
+                    ) : (
+                    <span>Selecione um período</span>
+                    )}
+                </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                    initialFocus
+                    mode="range"
+                    defaultMonth={date?.from}
+                    selected={date}
+                    onSelect={setDate}
+                    numberOfMonths={2}
+                    locale={ptBR}
+                />
+                </PopoverContent>
+            </Popover>
+            <Select>
+                <SelectTrigger>
+                    <SelectValue placeholder="Tipo de Movimentação" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    <SelectItem value="entrada">Entrada</SelectItem>
+                    <SelectItem value="saida">Saída</SelectItem>
+                    <SelectItem value="devolucao">Devolução</SelectItem>
+                </SelectContent>
+            </Select>
+            <Select>
+                <SelectTrigger>
+                    <SelectValue placeholder="Tipo de Material" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    <SelectItem value="consumo">Consumo</SelectItem>
+                    <SelectItem value="permanente">Permanente</SelectItem>
+                </SelectContent>
+            </Select>
+            <Button>Aplicar Filtros</Button>
         </CardContent>
       </Card>
+      
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total de Movimentações</CardTitle>
+            <BarChartHorizontal className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totalMovements}</div>
+            <p className="text-xs text-muted-foreground">No período selecionado</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Item Mais Movimentado</CardTitle>
+            <Package className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold truncate" title={mostMovedItem.name}>{mostMovedItem.name}</div>
+            <p className="text-xs text-muted-foreground">{mostMovedItem.count} movimentações</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Setor com Maior Consumo</CardTitle>
+            <Building className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{topSector.name}</div>
+            <p className="text-xs text-muted-foreground">{topSector.count} requisições</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Entradas vs Saídas</CardTitle>
+          </CardHeader>
+          <CardContent className="flex items-center justify-center gap-4">
+              <div className="flex items-center gap-2">
+                <ArrowUpRight className="h-6 w-6 text-green-500" />
+                <div className="text-xl font-bold">{totalEntries}</div>
+              </div>
+              <div className="flex items-center gap-2">
+                <ArrowDownLeft className="h-6 w-6 text-red-500" />
+                <div className="text-xl font-bold">{totalExits}</div>
+              </div>
+          </CardContent>
+        </Card>
+      </div>
+
+     <div className="grid gap-6 md:grid-cols-2">
+        <Card>
+            <CardHeader>
+                <CardTitle>Movimentações por Dia</CardTitle>
+                <CardDescription>Evolução de entradas e saídas no período.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                    <LineChart data={movementsByDay}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="date" />
+                        <YAxis />
+                        <Tooltip />
+                        <Legend />
+                        <Line type="monotone" dataKey="Entrada" stroke={COLORS[1]} />
+                        <Line type="monotone" dataKey="Saída" stroke={COLORS[0]} />
+                    </LineChart>
+                </ResponsiveContainer>
+            </CardContent>
+        </Card>
+        <Card>
+            <CardHeader>
+                <CardTitle>Top 10 Itens Mais Movimentados</CardTitle>
+                <CardDescription>Itens com maior volume de entradas e saídas.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                 <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={top10Items} layout="vertical">
+                         <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis type="number" />
+                        <YAxis dataKey="name" type="category" width={120} tick={{ fontSize: 12 }} />
+                        <Tooltip />
+                        <Legend />
+                        <Bar dataKey="count" fill={COLORS[0]} name="Movimentações"/>
+                    </BarChart>
+                </ResponsiveContainer>
+            </CardContent>
+        </Card>
+     </div>
     </div>
   );
 }
