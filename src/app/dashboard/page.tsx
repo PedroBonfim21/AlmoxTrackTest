@@ -41,10 +41,14 @@ const movements = [
 ];
 
 export default function DashboardPage() {
-  const [date, setDate] = React.useState<DateRange | undefined>({
-    from: new Date(2024, 4, 1),
-    to: new Date(),
-  });
+  const [date, setDate] = React.useState<DateRange | undefined>(undefined);
+
+  React.useEffect(() => {
+    setDate({
+      from: new Date(2024, 4, 1),
+      to: new Date(),
+    });
+  }, []);
 
   return (
     <div className="flex flex-col gap-6">
