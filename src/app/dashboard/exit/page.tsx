@@ -5,6 +5,7 @@ import * as React from "react";
 import { Calendar as CalendarIcon, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import Image from "next/image";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -52,6 +53,8 @@ type RequestedItem = {
     unit: string;
 };
 
+type Product = (typeof allProducts)[0];
+
 export default function ExitPage() {
     const { toast } = useToast();
     const [activeTab, setActiveTab] = React.useState("consumption");
@@ -62,6 +65,8 @@ export default function ExitPage() {
     const [department, setDepartment] = React.useState("");
     const [purpose, setPurpose] = React.useState("");
     const [consumptionSearchTerm, setConsumptionSearchTerm] = React.useState("");
+    const [consumptionSearchResults, setConsumptionSearchResults] = React.useState<Product[]>([]);
+    const [isConsumptionSearchOpen, setIsConsumptionSearchOpen] = React.useState(false);
     const [consumptionQuantity, setConsumptionQuantity] = React.useState(1);
     const [requestedItems, setRequestedItems] = React.useState<RequestedItem[]>([]);
 
@@ -71,12 +76,53 @@ export default function ExitPage() {
     const [responsibilityDepartment, setResponsibilityDepartment] = React.useState("");
     const [projectDescription, setProjectDescription] = React.useState("");
     const [responsibilitySearchTerm, setResponsibilitySearchTerm] = React.useState("");
+    const [responsibilitySearchResults, setResponsibilitySearchResults] = React.useState<Product[]>([]);
+    const [isResponsibilitySearchOpen, setIsResponsibilitySearchOpen] = React.useState(false);
     const [responsibilityQuantity, setResponsibilityQuantity] = React.useState(1);
     const [responsibilityItems, setResponsibilityItems] = React.useState<RequestedItem[]>([]);
     const [isConfirmDialogOpen, setIsConfirmDialogOpen] = React.useState(false);
     
     const consumableItems = allProducts.filter(p => p.type === 'consumo');
     const permanentItems = allProducts.filter(p => p.type === 'permanente');
+
+    React.useEffect(() => {
+        if (consumptionSearchTerm.trim()) {
+            const results = consumableItems.filter(item =>
+                item.name.toLowerCase().includes(consumptionSearchTerm.toLowerCase()) ||
+                item.code.toLowerCase().includes(consumptionSearchTerm.toLowerCase())
+            );
+            setConsumptionSearchResults(results);
+            setIsConsumptionSearchOpen(results.length > 0);
+        } else {
+            setConsumptionSearchResults([]);
+            setIsConsumptionSearchOpen(false);
+        }
+    }, [consumptionSearchTerm]);
+
+     React.useEffect(() => {
+        if (responsibilitySearchTerm.trim()) {
+            const results = permanentItems.filter(item =>
+                item.name.toLowerCase().includes(responsibilitySearchTerm.toLowerCase()) ||
+                item.code.toLowerCase().includes(responsibilitySearchTerm.toLowerCase())
+            );
+            setResponsibilitySearchResults(results);
+            setIsResponsibilitySearchOpen(results.length > 0);
+        } else {
+            setResponsibilitySearchResults([]);
+            setIsResponsibilitySearchOpen(false);
+        }
+    }, [responsibilitySearchTerm]);
+    
+    const handleSelectSearchItem = (item: Product, type: 'consumption' | 'responsibility') => {
+        if (type === 'consumption') {
+            setConsumptionSearchTerm(item.name);
+            setIsConsumptionSearchOpen(false);
+        } else {
+            setResponsibilitySearchTerm(item.name);
+            setIsResponsibilitySearchOpen(false);
+        }
+    }
+
 
     const handleAddItem = (type: 'consumption' | 'responsibility') => {
         const searchTerm = type === 'consumption' ? consumptionSearchTerm : responsibilitySearchTerm;
@@ -90,8 +136,8 @@ export default function ExitPage() {
         }
 
         const item = items.find(i => 
-            i.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-            i.code.toLowerCase().includes(searchTerm.toLowerCase())
+            i.name.toLowerCase() === searchTerm.toLowerCase() || 
+            i.code.toLowerCase() === searchTerm.toLowerCase()
         );
 
         if (!item) {
@@ -251,18 +297,38 @@ export default function ExitPage() {
                                     <CardHeader>
                                         <CardTitle>Itens Solicitados</CardTitle>
                                         <div className="flex flex-col md:flex-row items-end gap-2 pt-4">
-                                            <div className="flex-1 w-full">
+                                            <div className="flex-1 w-full relative">
                                                 <label htmlFor="search-item-consumption" className="text-sm font-medium">Buscar Item de Consumo</label>
                                                 <Input 
                                                     id="search-item-consumption" 
                                                     placeholder="Digite para buscar..." 
                                                     value={consumptionSearchTerm} 
                                                     onChange={e => setConsumptionSearchTerm(e.target.value)}
-                                                    list="consumable-items"
+                                                    autoComplete="off"
                                                 />
-                                                <datalist id="consumable-items">
-                                                    {consumableItems.map(item => <option key={item.id} value={item.name} />)}
-                                                </datalist>
+                                                {isConsumptionSearchOpen && consumptionSearchResults.length > 0 && (
+                                                    <div className="absolute z-10 w-full mt-1 bg-background border border-border rounded-md shadow-lg max-h-60 overflow-y-auto">
+                                                        {consumptionSearchResults.map(item => (
+                                                            <div 
+                                                                key={item.id}
+                                                                className="flex items-center gap-4 p-2 cursor-pointer hover:bg-muted"
+                                                                onClick={() => handleSelectSearchItem(item, 'consumption')}
+                                                            >
+                                                                <Image 
+                                                                    src={item.image}
+                                                                    alt={item.name}
+                                                                    width={40}
+                                                                    height={40}
+                                                                    className="rounded-md object-cover aspect-square"
+                                                                />
+                                                                <div>
+                                                                    <div className="font-medium">{item.name}</div>
+                                                                    <div className="text-sm text-muted-foreground">{item.code}</div>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
                                             </div>
                                             <div className="w-full md:w-24">
                                                 <label htmlFor="quantity-consumption" className="text-sm font-medium">Qtd.</label>
@@ -356,18 +422,38 @@ export default function ExitPage() {
                                     <CardHeader>
                                         <CardTitle>Itens Sob Responsabilidade</CardTitle>
                                         <div className="flex flex-col md:flex-row items-end gap-2 pt-4">
-                                            <div className="flex-1 w-full">
+                                            <div className="flex-1 w-full relative">
                                                 <label htmlFor="search-item-responsibility" className="text-sm font-medium">Buscar Item Permanente</label>
                                                 <Input 
                                                     id="search-item-responsibility" 
                                                     placeholder="Digite para buscar por item permanente..." 
                                                     value={responsibilitySearchTerm} 
                                                     onChange={e => setResponsibilitySearchTerm(e.target.value)}
-                                                    list="permanent-items"
+                                                    autoComplete="off"
                                                 />
-                                                <datalist id="permanent-items">
-                                                    {permanentItems.map(item => <option key={item.id} value={item.name} />)}
-                                                </datalist>
+                                                 {isResponsibilitySearchOpen && responsibilitySearchResults.length > 0 && (
+                                                    <div className="absolute z-10 w-full mt-1 bg-background border border-border rounded-md shadow-lg max-h-60 overflow-y-auto">
+                                                        {responsibilitySearchResults.map(item => (
+                                                            <div 
+                                                                key={item.id}
+                                                                className="flex items-center gap-4 p-2 cursor-pointer hover:bg-muted"
+                                                                onClick={() => handleSelectSearchItem(item, 'responsibility')}
+                                                            >
+                                                                <Image 
+                                                                    src={item.image}
+                                                                    alt={item.name}
+                                                                    width={40}
+                                                                    height={40}
+                                                                    className="rounded-md object-cover aspect-square"
+                                                                />
+                                                                <div>
+                                                                    <div className="font-medium">{item.name}</div>
+                                                                    <div className="text-sm text-muted-foreground">{item.code}</div>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
                                             </div>
                                             <div className="w-full md:w-24">
                                                 <label htmlFor="quantity-responsibility" className="text-sm font-medium">Qtd.</label>
@@ -450,5 +536,7 @@ export default function ExitPage() {
     );
 }
 
+
+    
 
     
