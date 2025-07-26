@@ -218,6 +218,7 @@ export default function ExitPage() {
                 requester: `${requesterName} (${requesterId})`,
                 department: department,
                 purpose: purpose,
+                responsible: 'sdpinho29' // Mock responsible
             });
 
             await fetchProducts();
@@ -266,6 +267,7 @@ export default function ExitPage() {
                 requester: `${responsibleName} (${responsibleId})`,
                 department: responsibilityDepartment,
                 purpose: projectDescription,
+                responsible: 'sdpinho29' // Mock responsible
             });
 
             await fetchProducts();

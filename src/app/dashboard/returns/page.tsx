@@ -173,10 +173,10 @@ export default function ReturnsPage() {
             setReturningDepartment("");
             setReturnReason("");
             setReturnedItems([]);
-        } catch (error) {
+        } catch (error: any) {
             toast({
                 title: "Erro ao Finalizar Devolução",
-                description: "Não foi possível registrar a devolução. Tente novamente.",
+                description: error.message || "Não foi possível registrar a devolução. Tente novamente.",
                 variant: "destructive"
             });
         } finally {

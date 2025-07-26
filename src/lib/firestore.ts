@@ -42,6 +42,7 @@ type ExitData = {
     requester: string;
     department: string;
     purpose?: string;
+    responsible: string;
 }
 
 type ReturnData = {
@@ -73,23 +74,30 @@ export const updateProduct = async (productId: string, productData: Partial<Prod
 };
 
 export const updateProductQuantityOnEntry = async (productId: string, quantity: number): Promise<void> => {
-    const productDoc = doc(db, 'products', productId);
-    await updateDoc(productDoc, {
-        quantity: increment(quantity)
+    const productRef = doc(db, 'products', productId);
+    await runTransaction(db, async (transaction) => {
+        const productDoc = await transaction.get(productRef);
+        if (!productDoc.exists()) {
+            throw new Error("Product does not exist!");
+        }
+        transaction.update(productRef, { quantity: increment(quantity) });
     });
 };
 
+export const deleteProduct = async (productId: string): Promise<void> => {
+    // Also delete associated movements in a transaction? For now, just delete the product.
+    const productDoc = doc(db, 'products', productId);
+    await deleteDoc(productDoc);
+};
+
+
+// Transactional Functions for Movements
 export const finalizeEntry = async (entryData: EntryData): Promise<void> => {
     try {
         await runTransaction(db, async (transaction) => {
             for (const item of entryData.items) {
                 const productRef = doc(db, "products", item.id);
-                const productDoc = await transaction.get(productRef);
-
-                if (!productDoc.exists()) {
-                    throw new Error(`Product with ID ${item.id} does not exist!`);
-                }
-
+                
                 // Increment product quantity
                 transaction.update(productRef, { quantity: increment(item.quantity) });
 
@@ -120,8 +128,13 @@ export const finalizeExit = async (exitData: ExitData): Promise<void> => {
                 const productRef = doc(db, "products", item.id);
                 const productDoc = await transaction.get(productRef);
 
-                if (!productDoc.exists() || productDoc.data().quantity < item.quantity) {
-                    throw new Error(`Insufficient stock for product ID ${item.id}.`);
+                if (!productDoc.exists()) {
+                    throw new Error(`Produto com ID ${item.id} não encontrado.`);
+                }
+                
+                const currentQuantity = productDoc.data().quantity;
+                if (currentQuantity < item.quantity) {
+                    throw new Error(`Estoque insuficiente para ${productDoc.data().name}.`);
                 }
 
                 // Decrement product quantity
@@ -133,8 +146,8 @@ export const finalizeExit = async (exitData: ExitData): Promise<void> => {
                     date: exitData.date,
                     type: 'Saída',
                     quantity: item.quantity,
-                    responsible: exitData.requester,
-                    department: exitData.department
+                    responsible: exitData.responsible,
+                    department: exitData.department,
                 };
                 const movementRef = doc(collection(db, "movements"));
                 transaction.set(movementRef, movementData);
@@ -151,6 +164,10 @@ export const finalizeReturn = async (returnData: ReturnData): Promise<void> => {
         await runTransaction(db, async (transaction) => {
             for (const item of returnData.items) {
                 const productRef = doc(db, "products", item.id);
+                const productDoc = await transaction.get(productRef);
+                 if (!productDoc.exists()) {
+                    throw new Error(`Produto com ID ${item.id} não encontrado.`);
+                }
 
                 // Increment product quantity
                 transaction.update(productRef, { quantity: increment(item.quantity) });
@@ -162,7 +179,7 @@ export const finalizeReturn = async (returnData: ReturnData): Promise<void> => {
                     type: 'Devolução',
                     quantity: item.quantity,
                     responsible: returnData.responsible,
-                    department: returnData.department
+                    department: returnData.department,
                 };
                 const movementRef = doc(collection(db, "movements"));
                 transaction.set(movementRef, movementData);
@@ -175,14 +192,7 @@ export const finalizeReturn = async (returnData: ReturnData): Promise<void> => {
 };
 
 
-export const deleteProduct = async (productId: string): Promise<void> => {
-    // Also delete associated movements in a transaction? For now, just delete the product.
-    const productDoc = doc(db, 'products', productId);
-    await deleteDoc(productDoc);
-};
-
 // Movement Functions
-
 export const getMovements = async (): Promise<Movement[]> => {
     const snapshot = await getDocs(movementsCollection);
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Movement));

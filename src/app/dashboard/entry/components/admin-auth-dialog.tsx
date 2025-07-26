@@ -23,8 +23,7 @@ interface AdminAuthDialogProps {
 
 export function AdminAuthDialog({ isOpen, onOpenChange, onAuthSuccess }: AdminAuthDialogProps) {
   const { toast } = useToast();
-  const [password, setPassword] = React.useState("");
-
+  
   const handleAuthentication = () => {
     // This is not a secure way to handle authentication.
     // In a real application, this should be handled with a proper role-based access control system.
@@ -34,12 +33,10 @@ export function AdminAuthDialog({ isOpen, onOpenChange, onAuthSuccess }: AdminAu
       description: "Você pode adicionar um novo item.",
     });
     onAuthSuccess();
-    setPassword("");
     onOpenChange(false);
   };
   
   const handleClose = () => {
-    setPassword("");
     onOpenChange(false);
   }
 
