@@ -28,7 +28,7 @@ export default function LoginPage() {
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-background p-4">
-      <Card className="mx-auto max-w-sm w-full shadow-lg">
+      <Card className="mx-auto w-full max-w-sm shadow-lg">
         <CardHeader className="text-center">
           <Warehouse className="mx-auto h-12 w-12 text-primary mb-4" />
           <CardTitle className="text-2xl font-bold">AlmoxTrack</CardTitle>

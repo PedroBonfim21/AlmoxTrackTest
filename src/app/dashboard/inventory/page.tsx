@@ -217,7 +217,7 @@ export default function InventoryPage() {
               Consulte e gerencie todos os itens em estoque.
             </p>
           </div>
-          <Button onClick={() => setIsAddSheetOpen(true)}>
+          <Button onClick={() => setIsAddSheetOpen(true)} className="w-full sm:w-auto">
             <PlusCircle className="mr-2" />
             Adicionar Novo Item
           </Button>
@@ -236,14 +236,14 @@ export default function InventoryPage() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="border rounded-md">
+            <div className="border rounded-md overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-[80px]">Item</TableHead>
                     <TableHead>Nome</TableHead>
-                    <TableHead>Tipo</TableHead>
-                    <TableHead>Categoria</TableHead>
+                    <TableHead className="hidden md:table-cell">Tipo</TableHead>
+                    <TableHead className="hidden lg:table-cell">Categoria</TableHead>
                     <TableHead className="text-right">Qtd. em Estoque</TableHead>
                     <TableHead className="w-[100px] text-center">Ações</TableHead>
                   </TableRow>
@@ -264,15 +264,18 @@ export default function InventoryPage() {
                       <TableCell>
                         <div className="font-medium">{product.name}</div>
                         <div className="text-sm text-muted-foreground">
-                          Código: {product.code} / Patrimônio: {product.patrimony}
+                          Código: {product.code}
+                        </div>
+                         <div className="text-sm text-muted-foreground md:hidden">
+                          Patrimônio: {product.patrimony}
                         </div>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="hidden md:table-cell">
                         <Badge variant={product.type === 'permanente' ? 'secondary' : 'outline'}>
                           {product.type}
                         </Badge>
                       </TableCell>
-                      <TableCell>{product.category}</TableCell>
+                      <TableCell className="hidden lg:table-cell">{product.category}</TableCell>
                       <TableCell className="text-right">
                         <div className="font-medium">{product.quantity}</div>
                         <div className="text-sm text-muted-foreground">{product.unit}</div>

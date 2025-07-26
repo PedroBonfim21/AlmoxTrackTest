@@ -61,14 +61,14 @@ export default function DashboardPage() {
             Selecione o período para gerar o relatório de movimentações.
           </CardDescription>
         </CardHeader>
-        <CardContent className="flex flex-wrap items-center gap-4">
+        <CardContent className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
           <Popover>
             <PopoverTrigger asChild>
               <Button
                 id="date"
                 variant={"outline"}
                 className={cn(
-                  "w-[300px] justify-start text-left font-normal",
+                  "w-full sm:w-[300px] justify-start text-left font-normal",
                   !date && "text-muted-foreground"
                 )}
               >
@@ -99,35 +99,35 @@ export default function DashboardPage() {
               />
             </PopoverContent>
           </Popover>
-          <Button variant="accent">
+          <Button variant="accent" className="w-full sm:w-auto">
             Gerar Relatório
           </Button>
         </CardContent>
       </Card>
 
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-x-2">
+        <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between space-x-0 sm:space-x-2 space-y-2 sm:space-y-0">
           <div>
             <CardTitle>Relatório de Movimentações</CardTitle>
             <CardDescription>
               Exibindo as últimas movimentações no período selecionado.
             </CardDescription>
           </div>
-           <Button variant="outline">
+           <Button variant="outline" className="w-full sm:w-auto">
             <FileDown className="mr-2 h-4 w-4" />
             Exportar para CSV
           </Button>
         </CardHeader>
         <CardContent>
-          <div className="border rounded-md">
+          <div className="border rounded-md overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-[120px]">Data</TableHead>
                   <TableHead>Produto</TableHead>
-                  <TableHead className="w-[180px]">Tipo</TableHead>
+                  <TableHead className="w-[120px]">Tipo</TableHead>
                   <TableHead className="text-right w-[120px]">Quantidade</TableHead>
-                  <TableHead className="w-[180px]">Responsável</TableHead>
+                  <TableHead className="w-[180px] hidden md:table-cell">Responsável</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -141,7 +141,7 @@ export default function DashboardPage() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">{movement.quantity}</TableCell>
-                    <TableCell>{movement.responsible}</TableCell>
+                    <TableCell className="hidden md:table-cell">{movement.responsible}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

@@ -63,7 +63,7 @@ export default function DashboardLayout({
         <SidebarHeader>
           <div className="flex items-center gap-2 p-2">
             <Warehouse className="w-8 h-8 text-primary" />
-            <span className="text-xl font-semibold">Almoxarifado</span>
+            <span className="text-xl font-semibold">AlmoxTrack</span>
           </div>
         </SidebarHeader>
         <SidebarContent>
@@ -133,15 +133,15 @@ export default function DashboardLayout({
         </SidebarFooter>
       </Sidebar>
       <SidebarInset>
-        <header className="sticky top-0 z-30 flex h-16 items-center justify-end gap-4 border-b bg-background/80 backdrop-blur-sm px-4 sm:px-6">
+        <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-4 border-b bg-background/80 backdrop-blur-sm px-4 sm:px-6">
           <SidebarTrigger className="sm:hidden -ml-2" />
-          <div className="flex-1" />
+          
            <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
                 variant="outline"
                 size="icon"
-                className="overflow-hidden rounded-full"
+                className="overflow-hidden rounded-full ml-auto"
               >
                 <CircleUser className="h-5 w-5" />
               </Button>
