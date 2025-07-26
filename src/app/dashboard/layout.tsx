@@ -41,6 +41,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { usePathname } from "next/navigation";
+import { SheetTitle } from "@/components/ui/sheet";
+
 
 export default function DashboardLayout({
   children,
@@ -53,13 +55,14 @@ export default function DashboardLayout({
     { href: "/dashboard", icon: LayoutDashboard, label: "Painel" },
     { href: "/dashboard/inventory", icon: Package, label: "Inventário" },
     { href: "/dashboard/entry", icon: ArrowRightToLine, label: "Entrada" },
-    { href: "#", icon: ArrowLeftFromLine, label: "Saída" },
+    { href: "/dashboard/exit", icon: ArrowLeftFromLine, label: "Saída" },
     { href: "#", icon: ChevronsLeftRight, label: "Devolução" },
   ];
 
   return (
     <SidebarProvider>
       <Sidebar>
+          <SheetTitle className="sr-only">Menu de Navegação</SheetTitle>
         <SidebarHeader>
           <div className="flex items-center gap-2 p-2">
             <Warehouse className="w-8 h-8 text-primary" />
@@ -133,7 +136,7 @@ export default function DashboardLayout({
         </SidebarFooter>
       </Sidebar>
       <SidebarInset>
-        <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-4 border-b bg-background/80 backdrop-blur-sm px-4 sm:px-6">
+        <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-4 border-b bg-background/80 backdrop-blur-sm px-4 sm:px-6 md:hidden">
           <SidebarTrigger className="sm:hidden -ml-2" />
           
            <DropdownMenu>
