@@ -42,6 +42,8 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { products as allProducts, addMovement } from "@/lib/mock-data";
@@ -81,6 +83,7 @@ export default function ExitPage() {
     const [responsibilityQuantity, setResponsibilityQuantity] = React.useState(1);
     const [responsibilityItems, setResponsibilityItems] = React.useState<RequestedItem[]>([]);
     const [isConfirmDialogOpen, setIsConfirmDialogOpen] = React.useState(false);
+    const [isTermAccepted, setIsTermAccepted] = React.useState(false);
     
     const consumableItems = allProducts.filter(p => p.type === 'consumo');
     const permanentItems = allProducts.filter(p => p.type === 'permanente');
@@ -217,6 +220,7 @@ export default function ExitPage() {
             toast({ title: "Nenhum item adicionado", description: "Adicione pelo menos um item para gerar o termo.", variant: "destructive" });
             return;
         }
+        setIsTermAccepted(false);
         setIsConfirmDialogOpen(true);
     };
     
@@ -509,24 +513,70 @@ export default function ExitPage() {
             </Tabs>
              {isConfirmDialogOpen && (
                 <AlertDialog open={isConfirmDialogOpen} onOpenChange={setIsConfirmDialogOpen}>
-                    <AlertDialogContent>
+                    <AlertDialogContent className="max-w-3xl">
                         <AlertDialogHeader>
-                            <AlertDialogTitle>Confirmar Termo de Responsabilidade</AlertDialogTitle>
-                            <AlertDialogDescription>
-                                Você está prestes a registrar a saída dos seguintes itens sob sua responsabilidade:
-                                <ul className="list-disc pl-5 mt-2">
-                                    {responsibilityItems.map(item => (
-                                        <li key={item.id}>{item.quantity}x {item.name}</li>
-                                    ))}
-                                </ul>
-                                 Ao confirmar, você se declara responsável pela guarda e conservação dos mesmos.
-                                 Esta ação não poderá ser desfeita.
-                            </AlertDialogDescription>
+                            <AlertDialogTitle className="text-center text-xl">
+                                TERMO DE RESPONSABILIDADE DE MATERIAIS PERMANENTES
+                            </AlertDialogTitle>
                         </AlertDialogHeader>
+                        <div className="text-sm text-justify space-y-4 p-4 border rounded-md bg-white">
+                            <p>
+                                Pelo presente termo, eu, <strong>{responsibleName || '[NOME DO SERVIDOR]'}</strong>, matrícula nº <strong>[XXX]</strong>, servidor(a) da Secretaria Municipal de <strong>{responsibilityDepartment || '[NOME DA SECRETARIA]'}</strong>, assumo a responsabilidade pelo recebimento e guarda dos materiais permanentes abaixo descritos, destinados ao uso exclusivo nas atividades institucionais.
+                            </p>
+
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Nº Patrimonial</TableHead>
+                                        <TableHead>Descrição do Bem</TableHead>
+                                        <TableHead>Marca/Modelo</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {responsibilityItems.map(reqItem => {
+                                        const product = allProducts.find(p => p.id === reqItem.id);
+                                        return (
+                                            <TableRow key={reqItem.id}>
+                                                <TableCell>{product?.patrimony || 'N/A'}</TableCell>
+                                                <TableCell>{reqItem.name}</TableCell>
+                                                <TableCell>N/A</TableCell>
+                                            </TableRow>
+                                        );
+                                    })}
+                                </TableBody>
+                            </Table>
+
+                            <div>
+                                <h3 className="font-semibold mb-2">Declaro estar ciente de que:</h3>
+                                <ul className="list-disc list-inside space-y-1 text-xs">
+                                    <li>É vedada a utilização do bem para fins particulares.</li>
+                                    <li>Sou responsável pela guarda, conservação e uso adequado.</li>
+                                    <li>Em caso de extravio, dano ou mau uso, devo comunicar imediatamente ao setor competente.</li>
+                                    <li>Este termo deverá ser renovado em caso de transferência de setor, baixa patrimonial ou substituição do bem.</li>
+                                </ul>
+                            </div>
+
+                            <div className="pt-4">
+                                <p>Local e Data: __________, {format(new Date(), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}</p>
+                            </div>
+
+                            <div className="flex justify-around pt-12 text-center text-xs">
+                                <div className="border-t w-1/4">Assinatura do Responsável pelo Setor</div>
+                                <div className="border-t w-1/4">Assinatura do Servidor Responsável</div>
+                                <div className="border-t w-1/4">Assinatura do Almoxarife/Patrimônio</div>
+                            </div>
+                            
+                        </div>
+                        <div className="flex items-center space-x-2 pt-4">
+                            <Checkbox id="terms" checked={isTermAccepted} onCheckedChange={(checked) => setIsTermAccepted(checked as boolean)} />
+                            <Label htmlFor="terms" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                                Declaro que li e concordo com os termos de responsabilidade.
+                            </Label>
+                         </div>
                         <AlertDialogFooter>
                             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                            <AlertDialogAction onClick={confirmFinalizeResponsibility}>
-                                Confirmar e Gerar Termo
+                            <AlertDialogAction onClick={confirmFinalizeResponsibility} disabled={!isTermAccepted}>
+                                Confirmar Termo
                             </AlertDialogAction>
                         </AlertDialogFooter>
                     </AlertDialogContent>
@@ -535,8 +585,3 @@ export default function ExitPage() {
         </div>
     );
 }
-
-
-    
-
-    
