@@ -44,7 +44,7 @@ type RequestedItem = {
 
 export default function ConsumptionRequestForm() {
     const { toast } = useToast();
-    const [requestDate, setRequestDate] = React.useState<Date | undefined>(new Date());
+    const [requestDate, setRequestDate] = React.useState<Date | undefined>(undefined);
     const [requesterName, setRequesterName] = React.useState("");
     const [requesterId, setRequesterId] = React.useState("");
     const [department, setDepartment] = React.useState("");
@@ -57,6 +57,10 @@ export default function ConsumptionRequestForm() {
     const [isLoading, setIsLoading] = React.useState(false);
     const [isFinalizing, setIsFinalizing] = React.useState(false);
     
+    React.useEffect(() => {
+        setRequestDate(new Date());
+    }, []);
+
     const fetchProducts = React.useCallback(async (term: string) => {
         setIsLoading(true);
         try {

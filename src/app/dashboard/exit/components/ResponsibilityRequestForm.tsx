@@ -55,7 +55,7 @@ type RequestedItem = {
 
 export default function ResponsibilityRequestForm() {
     const { toast } = useToast();
-    const [responsibilityDate, setResponsibilityDate] = React.useState<Date | undefined>(new Date());
+    const [responsibilityDate, setResponsibilityDate] = React.useState<Date | undefined>(undefined);
     const [responsibleName, setResponsibleName] = React.useState("");
     const [responsibleId, setResponsibleId] = React.useState("");
     const [responsibilityDepartment, setResponsibilityDepartment] = React.useState("");
@@ -69,6 +69,10 @@ export default function ResponsibilityRequestForm() {
     const [isTermAccepted, setIsTermAccepted] = React.useState(false);
     const [isLoading, setIsLoading] = React.useState(false);
     const [isFinalizing, setIsFinalizing] = React.useState(false);
+
+    React.useEffect(() => {
+        setResponsibilityDate(new Date());
+    }, []);
 
     const fetchProducts = React.useCallback(async (term: string) => {
         setIsLoading(true);

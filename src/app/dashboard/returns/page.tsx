@@ -51,7 +51,7 @@ type ReturnedItem = {
 
 export default function ReturnsPage() {
     const { toast } = useToast();
-    const [returnDate, setReturnDate] = React.useState<Date | undefined>(new Date());
+    const [returnDate, setReturnDate] = React.useState<Date | undefined>(undefined);
     const [returningDepartment, setReturningDepartment] = React.useState("");
     const [returnReason, setReturnReason] = React.useState("");
     const [searchTerm, setSearchTerm] = React.useState("");
@@ -61,6 +61,10 @@ export default function ReturnsPage() {
     const [isSearchOpen, setIsSearchOpen] = React.useState(false);
     const [isLoading, setIsLoading] = React.useState(false);
     const [isFinalizing, setIsFinalizing] = React.useState(false);
+
+    React.useEffect(() => {
+        setReturnDate(new Date());
+    }, []);
 
     const fetchProducts = React.useCallback(async (term: string) => {
         setIsLoading(true);

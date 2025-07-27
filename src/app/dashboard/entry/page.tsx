@@ -48,7 +48,7 @@ const currentUserRole = "Operator";
 
 export default function EntryPage() {
     const { toast } = useToast();
-    const [entryDate, setEntryDate] = React.useState<Date | undefined>(new Date());
+    const [entryDate, setEntryDate] = React.useState<Date | undefined>(undefined);
     const [supplier, setSupplier] = React.useState("");
     const [invoice, setInvoice] = React.useState("");
     
@@ -62,6 +62,10 @@ export default function EntryPage() {
     const [isAuthDialogOpen, setIsAuthDialogOpen] = React.useState(false);
     const [isLoading, setIsLoading] = React.useState(false);
     const [isFinalizing, setIsFinalizing] = React.useState(false);
+
+    React.useEffect(() => {
+        setEntryDate(new Date());
+    }, []);
 
     const fetchProducts = React.useCallback(async (term: string) => {
         if (term.length < 2) {

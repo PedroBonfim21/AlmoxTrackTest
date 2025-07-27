@@ -58,14 +58,19 @@ export default function DashboardPage() {
   const [movements, setMovements] = React.useState<Movement[]>([]);
   const [allDepartments, setAllDepartments] = React.useState<string[]>([]);
   
-  const [startDate, setStartDate] = React.useState<Date | undefined>(subDays(new Date(), 29));
-  const [endDate, setEndDate] = React.useState<Date | undefined>(new Date());
+  const [startDate, setStartDate] = React.useState<Date | undefined>(undefined);
+  const [endDate, setEndDate] = React.useState<Date | undefined>(undefined);
   
   const [movementType, setMovementType] = React.useState("all");
   const [materialType, setMaterialType] = React.useState("all");
   const [department, setDepartment] = React.useState("all");
   const [isLoading, setIsLoading] = React.useState(true);
   const { toast } = useToast();
+
+  React.useEffect(() => {
+    setStartDate(subDays(new Date(), 29));
+    setEndDate(new Date());
+  }, []);
   
   const fetchDashboardData = React.useCallback(async () => {
     setIsLoading(true);
