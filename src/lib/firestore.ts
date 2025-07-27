@@ -9,6 +9,7 @@ export type Product = {
     id: string;
     image?: string;
     name: string;
+    name_lowercase: string;
     code: string;
     patrimony: string;
     type: 'consumo' | 'permanente';
@@ -85,16 +86,13 @@ export const getProducts = async (filters: ProductFilters = {}): Promise<Product
     }
 
     if (searchTerm) {
-        // This is a common and effective way to implement "starts-with" search in Firestore.
-        // It finds all documents where the 'name' field is greater than or equal to the search term
-        // and less than the search term followed by a high-unicode character.
-        constraints.push(where('name', '>=', searchTerm));
-        constraints.push(where('name', '<=', searchTerm + '\uf8ff'));
+        const lowercasedTerm = searchTerm.toLowerCase();
+        constraints.push(where('name_lowercase', '>=', lowercasedTerm));
+        constraints.push(where('name_lowercase', '<=', lowercasedTerm + '\uf8ff'));
     }
     
-    // Add a default ordering to make queries more consistent
-    constraints.push(orderBy('name'));
-    constraints.push(limit(25)); // Limit results to prevent fetching too much data
+    constraints.push(orderBy('name_lowercase'));
+    constraints.push(limit(25));
 
     const finalQuery = query(productsCollection, ...constraints);
     const snapshot = await getDocs(finalQuery);
@@ -104,7 +102,6 @@ export const getProducts = async (filters: ProductFilters = {}): Promise<Product
         products.push({ id: doc.id, ...doc.data() } as Product);
     });
 
-    // If search term is a code, try an exact match as a fallback (less common)
     if (searchTerm && products.length === 0) {
         const codeQuery = query(productsCollection, where('code', '==', searchTerm));
         const codeSnapshot = await getDocs(codeQuery);

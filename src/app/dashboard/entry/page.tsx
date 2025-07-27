@@ -117,6 +117,7 @@ export default function EntryPage() {
 
             const newProductData: Omit<Product, 'id'> = {
                 name: newItemData.name,
+                name_lowercase: newItemData.name.toLowerCase(),
                 code: newItemData.itemCode || `new-${Date.now()}`,
                 unit: newItemData.unit,
                 patrimony: newItemData.materialType === 'permanente' ? newItemData.patrimony : 'N/A',

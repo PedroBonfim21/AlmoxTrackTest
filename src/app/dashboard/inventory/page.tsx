@@ -95,6 +95,7 @@ export default function InventoryPage() {
         
         const newProduct: Omit<Product, 'id'> = {
           name: newItemData.name,
+          name_lowercase: newItemData.name.toLowerCase(),
           code: itemCode,
           patrimony: newItemData.materialType === 'permanente' ? newItemData.patrimony : 'N/A',
           type: newItemData.materialType,
@@ -143,6 +144,7 @@ export default function InventoryPage() {
 
         const updateData: Partial<Product> = {
             name: updatedItemData.name,
+            name_lowercase: updatedItemData.name.toLowerCase(),
             type: updatedItemData.materialType,
             code: updatedItemData.itemCode,
             patrimony: updatedItemData.materialType === 'permanente' ? updatedItemData.patrimony : 'N/A',
