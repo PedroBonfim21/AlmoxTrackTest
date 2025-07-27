@@ -57,10 +57,10 @@ export default function InventoryPage() {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = React.useState(true);
 
-  const fetchProducts = React.useCallback(async () => {
+  const fetchProducts = React.useCallback(async (term: string) => {
     setIsLoading(true);
     try {
-      const productsFromDb = await getProducts();
+      const productsFromDb = await getProducts({ searchTerm: term });
       setProducts(productsFromDb);
     } catch (error) {
        toast({
@@ -74,8 +74,14 @@ export default function InventoryPage() {
   }, [toast]);
 
   React.useEffect(() => {
-    fetchProducts();
-  }, [fetchProducts]);
+    const handler = setTimeout(() => {
+      fetchProducts(searchTerm);
+    }, 500); // Debounce search
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [searchTerm, fetchProducts]);
 
   const handleAddItem = React.useCallback(async (newItemData: any) => {
     setIsLoading(true);
@@ -114,7 +120,7 @@ export default function InventoryPage() {
             title: "Item Adicionado!",
             description: `${newProduct.name} foi adicionado ao inventário.`,
         });
-        fetchProducts(); // Refresh the product list
+        fetchProducts(searchTerm); // Refresh the product list
     } catch(error) {
         toast({
             title: "Erro ao Adicionar Item",
@@ -124,7 +130,7 @@ export default function InventoryPage() {
     } finally {
         setIsLoading(false);
     }
-  }, [fetchProducts, toast]);
+  }, [fetchProducts, toast, searchTerm]);
   
   const handleUpdateItem = async (updatedItemData: any) => {
     if (!selectedItem) return;
@@ -152,7 +158,7 @@ export default function InventoryPage() {
           title: "Item Atualizado!",
           description: `${updatedItemData.name} foi atualizado com sucesso.`,
         });
-        fetchProducts(); // Refresh the product list
+        fetchProducts(searchTerm); // Refresh the product list
     } catch(error) {
          toast({
             title: "Erro ao Atualizar Item",
@@ -172,7 +178,7 @@ export default function InventoryPage() {
             title: "Item Excluído!",
             description: "O item foi removido do inventário.",
         });
-        fetchProducts(); // Refresh the product list
+        fetchProducts(searchTerm); // Refresh the product list
     } catch(error) {
         toast({
             title: "Erro ao Excluir Item",
@@ -195,12 +201,6 @@ export default function InventoryPage() {
     setSelectedItem(product);
     setIsMovementsSheetOpen(true);
   };
-
-  const filteredProducts = products.filter(
-    (product) =>
-      product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      product.code.toLowerCase().includes(searchTerm.toLowerCase())
-  );
 
   return (
     <>
@@ -248,8 +248,8 @@ export default function InventoryPage() {
                      <TableRow>
                       <TableCell colSpan={6} className="text-center text-muted-foreground">Carregando inventário...</TableCell>
                     </TableRow>
-                  ) : filteredProducts.length > 0 ? (
-                    filteredProducts.map((product) => (
+                  ) : products.length > 0 ? (
+                    products.map((product) => (
                       <TableRow key={product.id}>
                         <TableCell>
                           <Image
