@@ -84,26 +84,42 @@ export const getProducts = async (filters: ProductFilters = {}): Promise<Product
     if (materialType) {
         constraints.push(where('type', '==', materialType));
     }
+    
+    // Add orderBy name_lowercase by default for consistent ordering.
+    constraints.push(orderBy('name_lowercase'));
 
     if (searchTerm) {
         const lowercasedTerm = searchTerm.toLowerCase();
-        constraints.push(where('name_lowercase', '>=', lowercasedTerm));
-        constraints.push(where('name_lowercase', '<=', lowercasedTerm + '\uf8ff'));
+        // Overwrite the constraints for search
+        constraints = [
+            where('name_lowercase', '>=', lowercasedTerm),
+            where('name_lowercase', '<=', lowercasedTerm + '\uf8ff'),
+            orderBy('name_lowercase'),
+        ];
+        if (materialType) {
+            constraints.push(where('type', '==', materialType));
+        }
     }
     
-    constraints.push(orderBy('name_lowercase'));
     constraints.push(limit(25));
 
     const finalQuery = query(productsCollection, ...constraints);
     const snapshot = await getDocs(finalQuery);
 
-    const products: Product[] = [];
+    let products: Product[] = [];
     snapshot.forEach(doc => {
         products.push({ id: doc.id, ...doc.data() } as Product);
     });
 
+    // If name search returns nothing, try searching by code
     if (searchTerm && products.length === 0) {
-        const codeQuery = query(productsCollection, where('code', '==', searchTerm));
+        let codeConstraints: QueryConstraint[] = [
+            where('code', '==', searchTerm)
+        ];
+        if (materialType) {
+            codeConstraints.push(where('type', '==', materialType));
+        }
+        const codeQuery = query(productsCollection, ...codeConstraints);
         const codeSnapshot = await getDocs(codeQuery);
         codeSnapshot.forEach(doc => {
             products.push({ id: doc.id, ...doc.data() } as Product);
@@ -298,3 +314,4 @@ export const updateProductQuantityOnEntry = async (productId: string, quantity: 
         quantity: increment(quantity)
     });
 };
+
