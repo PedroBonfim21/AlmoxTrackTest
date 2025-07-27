@@ -2,10 +2,9 @@
 "use client";
 
 import * as React from "react";
-import { PlusCircle, Search, Calendar as CalendarIcon, Trash2 } from "lucide-react";
+import { Calendar as CalendarIcon, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import Image from "next/image";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -31,10 +30,11 @@ import {
 import { Calendar } from "@/components/ui/calendar";
 import { AddItemSheet } from "../inventory/components/add-item-sheet";
 import { AdminAuthDialog } from "./components/admin-auth-dialog";
+import { ItemSearch } from "../components/item-search";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import type { Product } from "@/lib/firestore";
-import { getProducts, addProduct, finalizeEntry, uploadImage } from "@/lib/firestore";
+import { addProduct, finalizeEntry, uploadImage, getProducts } from "@/lib/firestore";
 
 type ReceivedItem = {
     id: string;
@@ -52,9 +52,6 @@ export default function EntryPage() {
     const [supplier, setSupplier] = React.useState("");
     const [invoice, setInvoice] = React.useState("");
     
-    const [searchTerm, setSearchTerm] = React.useState("");
-    const [searchResults, setSearchResults] = React.useState<Product[]>([]);
-    const [isSearchOpen, setIsSearchOpen] = React.useState(false);
     const [quantity, setQuantity] = React.useState(1);
     const [receivedItems, setReceivedItems] = React.useState<ReceivedItem[]>([]);
     
@@ -62,75 +59,28 @@ export default function EntryPage() {
     const [isAuthDialogOpen, setIsAuthDialogOpen] = React.useState(false);
     const [isLoading, setIsLoading] = React.useState(false);
     const [isFinalizing, setIsFinalizing] = React.useState(false);
+    const [selectedItemForAddition, setSelectedItemForAddition] = React.useState<Product | null>(null);
 
     React.useEffect(() => {
         setEntryDate(new Date());
     }, []);
-
-    const fetchProducts = React.useCallback(async (term: string) => {
-        if (term.length < 2) {
-            setSearchResults([]);
-            setIsSearchOpen(false);
-            return;
-        }
-        setIsLoading(true);
-        try {
-            const productsFromDb = await getProducts({ searchTerm: term });
-            setSearchResults(productsFromDb);
-            setIsSearchOpen(productsFromDb.length > 0);
-        } catch (error) {
-            toast({
-                title: "Erro ao Buscar Produtos",
-                description: "Não foi possível buscar os produtos.",
-                variant: "destructive",
-            });
-        } finally {
-            setIsLoading(false);
-        }
-    }, [toast]);
-
-    React.useEffect(() => {
-        const handler = setTimeout(() => {
-            fetchProducts(searchTerm);
-        }, 500); // Debounce search
-
-        return () => {
-            clearTimeout(handler);
-        };
-    }, [searchTerm, fetchProducts]);
     
-    const refreshLocalProductList = React.useCallback(async () => {
-        // This function might not be necessary if the main product list is always fresh.
-        // For now, it's a placeholder if we need to force a full refresh.
-    }, []);
-
     const handleSelectSearchItem = (item: Product) => {
-        setSearchTerm(item.name);
-        setIsSearchOpen(false);
+        setSelectedItemForAddition(item);
     }
     
     const handleSearchOrAddItem = async () => {
-        if (!searchTerm) return;
+        if (!selectedItemForAddition) {
+             toast({
+                title: "Nenhum item selecionado",
+                description: "Por favor, busque e selecione um item da lista.",
+                variant: "destructive",
+            });
+            return;
+        };
         
-        // Find the selected item from the search results
-        const selectedItem = searchResults.find(item => item.name.toLowerCase() === searchTerm.toLowerCase());
-
-        if (selectedItem) {
-            handleAddToList(selectedItem);
-        } else {
-            // If not found in results, check if it's a new item
-            const currentProducts = await getProducts({searchTerm});
-            const existingItem = currentProducts.find(item => item.name.toLowerCase() === searchTerm.toLowerCase());
-            if (existingItem) {
-                 handleAddToList(existingItem);
-            } else {
-                 if (currentUserRole === 'Operator') {
-                    setIsAuthDialogOpen(true);
-                } else {
-                    setIsAddItemSheetOpen(true);
-                }
-            }
-        }
+        handleAddToList(selectedItemForAddition);
+        setSelectedItemForAddition(null); // Reset after adding
     };
     
     const handleAddToList = (item: { id: string; name: string; unit: string; }) => {
@@ -150,10 +100,7 @@ export default function EntryPage() {
             }
             return [...prev, { id: item.id, name: item.name, quantity, unit: item.unit }];
         });
-        setSearchTerm("");
         setQuantity(1);
-        setSearchResults([]);
-        setIsSearchOpen(false);
     };
 
     const handleRemoveFromList = (itemId: string) => {
@@ -317,45 +264,18 @@ export default function EntryPage() {
                     <CardHeader>
                         <CardTitle>Itens Recebidos</CardTitle>
                         <div className="flex flex-col md:flex-row items-end gap-2 pt-4">
-                            <div className="flex-1 w-full relative">
-                                <label htmlFor="search-item" className="text-sm font-medium">Buscar Item</label>
-                                <Input 
-                                    id="search-item" 
-                                    placeholder="Digite para buscar por nome ou código..." 
-                                    value={searchTerm} 
-                                    onChange={(e) => setSearchTerm(e.target.value)}
-                                    autoComplete="off"
-                                />
-                                {isSearchOpen && searchResults.length > 0 && (
-                                    <div className="absolute z-10 w-full mt-1 bg-background border border-border rounded-md shadow-lg max-h-60 overflow-y-auto">
-                                        {searchResults.map(item => (
-                                            <div 
-                                                key={item.id}
-                                                className="flex items-center gap-4 p-2 cursor-pointer hover:bg-muted"
-                                                onClick={() => handleSelectSearchItem(item)}
-                                            >
-                                                <Image 
-                                                    src={item.image || "https://placehold.co/40x40.png"}
-                                                    alt={item.name}
-                                                    width={40}
-                                                    height={40}
-                                                    className="rounded-md object-cover aspect-square"
-                                                />
-                                                <div>
-                                                    <div className="font-medium">{item.name}</div>
-                                                    <div className="text-sm text-muted-foreground">{item.code}</div>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
+                            <ItemSearch onSelectItem={handleSelectSearchItem} searchId="entry-item-search" />
                             <div className="w-full md:w-24">
                                <label htmlFor="quantity" className="text-sm font-medium">Qtd.</label>
                                <Input id="quantity" type="number" value={quantity} onChange={e => setQuantity(Number(e.target.value))} min="1" />
                             </div>
                             <Button onClick={handleSearchOrAddItem} className="w-full md:w-auto">Adicionar</Button>
                         </div>
+                        {selectedItemForAddition && (
+                            <div className="mt-2 p-2 bg-muted rounded-md text-sm">
+                                Item selecionado: <span className="font-medium">{selectedItemForAddition.name}</span>
+                            </div>
+                        )}
                     </CardHeader>
                     <CardContent>
                          <div className="border rounded-md overflow-x-auto">

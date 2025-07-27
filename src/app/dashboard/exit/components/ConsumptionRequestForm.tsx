@@ -5,7 +5,6 @@ import * as React from "react";
 import { Calendar as CalendarIcon, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import Image from "next/image";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -33,7 +32,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import type { Product } from "@/lib/firestore";
-import { getProducts, finalizeExit } from "@/lib/firestore";
+import { finalizeExit } from "@/lib/firestore";
+import { ItemSearch } from "../../components/item-search";
 
 type RequestedItem = {
     id: string;
@@ -49,64 +49,18 @@ export default function ConsumptionRequestForm() {
     const [requesterId, setRequesterId] = React.useState("");
     const [department, setDepartment] = React.useState("");
     const [purpose, setPurpose] = React.useState("");
-    const [searchTerm, setSearchTerm] = React.useState("");
-    const [searchResults, setSearchResults] = React.useState<Product[]>([]);
-    const [isSearchOpen, setIsSearchOpen] = React.useState(false);
     const [quantity, setQuantity] = React.useState(1);
     const [requestedItems, setRequestedItems] = React.useState<RequestedItem[]>([]);
-    const [isLoading, setIsLoading] = React.useState(false);
+    const [selectedItem, setSelectedItem] = React.useState<Product | null>(null);
     const [isFinalizing, setIsFinalizing] = React.useState(false);
     
     React.useEffect(() => {
         setRequestDate(new Date());
     }, []);
 
-    const fetchProducts = React.useCallback(async (term: string) => {
-        setIsLoading(true);
-        try {
-            const productsFromDb = await getProducts({ searchTerm: term, materialType: 'consumo' });
-            setSearchResults(productsFromDb);
-            if (productsFromDb.length > 0) setIsSearchOpen(true);
-        } catch(error) {
-             toast({
-                title: "Erro ao Buscar Produtos",
-                description: "Não foi possível buscar os produtos.",
-                variant: "destructive",
-            });
-        } finally {
-            setIsLoading(false);
-        }
-    }, [toast]);
-
-    React.useEffect(() => {
-        const handler = setTimeout(() => {
-            if (searchTerm.trim().length > 1) {
-                fetchProducts(searchTerm.trim());
-            } else {
-                setSearchResults([]);
-                setIsSearchOpen(false);
-            }
-        }, 500);
-        return () => clearTimeout(handler);
-    }, [searchTerm, fetchProducts]);
-    
-    const handleSelectSearchItem = (item: Product) => {
-        setSearchTerm(item.name);
-        setIsSearchOpen(false);
-    }
-
     const handleAddItem = () => {
-        if (!searchTerm.trim()) {
+        if (!selectedItem) {
             toast({ title: "Erro", description: "Por favor, busque e selecione um item.", variant: "destructive" });
-            return;
-        }
-
-        const item = searchResults.find(i => 
-            i.name.toLowerCase() === searchTerm.toLowerCase()
-        );
-
-        if (!item) {
-            toast({ title: "Item não encontrado", description: `O item buscado não existe no estoque de consumo.`, variant: "destructive" });
             return;
         }
 
@@ -115,25 +69,25 @@ export default function ConsumptionRequestForm() {
             return;
         }
 
-        if (item.quantity < quantity) {
-            toast({ title: "Estoque insuficiente", description: `A quantidade solicitada (${quantity}) é maior que a disponível (${item.quantity}).`, variant: "destructive" });
+        if (selectedItem.quantity < quantity) {
+            toast({ title: "Estoque insuficiente", description: `A quantidade solicitada (${quantity}) é maior que a disponível (${selectedItem.quantity}).`, variant: "destructive" });
             return;
         }
 
         setRequestedItems((prev) => {
-            const existing = prev.find((i) => i.id === item.id);
+            const existing = prev.find((i) => i.id === selectedItem.id);
             if (existing) {
                 const newQuantity = existing.quantity + quantity;
-                if (item.quantity < newQuantity) {
-                    toast({ title: "Estoque insuficiente", description: `A quantidade total solicitada (${newQuantity}) é maior que a disponível (${item.quantity}).`, variant: "destructive" });
+                if (selectedItem.quantity < newQuantity) {
+                    toast({ title: "Estoque insuficiente", description: `A quantidade total solicitada (${newQuantity}) é maior que a disponível (${selectedItem.quantity}).`, variant: "destructive" });
                     return prev;
                 }
-                return prev.map((i) => i.id === item.id ? { ...i, quantity: newQuantity } : i);
+                return prev.map((i) => i.id === selectedItem.id ? { ...i, quantity: newQuantity } : i);
             }
-            return [...prev, { id: item.id, name: item.name, quantity, unit: item.unit }];
+            return [...prev, { id: selectedItem.id, name: selectedItem.name, quantity, unit: selectedItem.unit }];
         });
 
-        setSearchTerm("");
+        setSelectedItem(null);
         setQuantity(1);
     };
 
@@ -228,45 +182,18 @@ export default function ConsumptionRequestForm() {
                         <CardHeader>
                             <CardTitle>Itens Solicitados</CardTitle>
                             <div className="flex flex-col md:flex-row items-end gap-2 pt-4">
-                                <div className="flex-1 w-full relative">
-                                    <label htmlFor="search-item-consumption" className="text-sm font-medium">Buscar Item de Consumo</label>
-                                    <Input 
-                                        id="search-item-consumption" 
-                                        placeholder="Digite para buscar..." 
-                                        value={searchTerm} 
-                                        onChange={e => setSearchTerm(e.target.value)}
-                                        autoComplete="off"
-                                    />
-                                    {isSearchOpen && searchResults.length > 0 && (
-                                        <div className="absolute z-10 w-full mt-1 bg-background border border-border rounded-md shadow-lg max-h-60 overflow-y-auto">
-                                            {searchResults.map(item => (
-                                                <div 
-                                                    key={item.id}
-                                                    className="flex items-center gap-4 p-2 cursor-pointer hover:bg-muted"
-                                                    onClick={() => handleSelectSearchItem(item)}
-                                                >
-                                                    <Image 
-                                                        src={item.image || "https://placehold.co/40x40.png"}
-                                                        alt={item.name}
-                                                        width={40}
-                                                        height={40}
-                                                        className="rounded-md object-cover aspect-square"
-                                                    />
-                                                    <div>
-                                                        <div className="font-medium">{item.name}</div>
-                                                        <div className="text-sm text-muted-foreground">{item.code}</div>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
+                               <ItemSearch onSelectItem={setSelectedItem} materialType="consumo" placeholder="Buscar item de consumo..." searchId="consumption-search" />
                                 <div className="w-full md:w-24">
                                     <label htmlFor="quantity-consumption" className="text-sm font-medium">Qtd.</label>
                                     <Input id="quantity-consumption" type="number" value={quantity} onChange={e => setQuantity(Number(e.target.value))} min="1" />
                                 </div>
                                 <Button onClick={handleAddItem} className="w-full md:w-auto">Adicionar</Button>
                             </div>
+                             {selectedItem && (
+                                <div className="mt-2 p-2 bg-muted rounded-md text-sm">
+                                    Item selecionado: <span className="font-medium">{selectedItem.name}</span> (Disponível: {selectedItem.quantity})
+                                </div>
+                            )}
                         </CardHeader>
                         <CardContent>
                             <div className="border rounded-md overflow-x-auto">
