@@ -2,7 +2,7 @@
 "use client";
 
 import * as React from "react";
-import { Calendar as CalendarIcon, Trash2 } from "lucide-react";
+import { Calendar as CalendarIcon, Trash2, PlusCircle } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -34,7 +34,7 @@ import { ItemSearch } from "../components/item-search";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import type { Product } from "@/lib/firestore";
-import { addProduct, finalizeEntry, uploadImage, getProducts } from "@/lib/firestore";
+import { addProduct, finalizeEntry, uploadImage, addMovement } from "@/lib/firestore";
 
 type ReceivedItem = {
     id: string;
@@ -42,9 +42,6 @@ type ReceivedItem = {
     quantity: number;
     unit: string;
 };
-
-// Mock user role
-const currentUserRole = "Operator"; 
 
 export default function EntryPage() {
     const { toast } = useToast();
@@ -128,19 +125,29 @@ export default function EntryPage() {
             };
             
             const newProductId = await addProduct(newProductData);
-            const newProductWithId = { ...newProductData, id: newProductId };
             
+            if(newItemData.initialQuantity > 0) {
+                await addMovement({
+                    productId: newProductId,
+                    date: new Date().toISOString(),
+                    type: 'Entrada',
+                    quantity: newItemData.initialQuantity,
+                    responsible: 'Sistema' // Or a logged in user
+                });
+            }
+
             toast({
                 title: "Item Adicionado!",
                 description: `${newProductData.name} foi adicionado ao inventário.`,
             });
             
+            // If the item had an initial quantity, add it directly to the received list
             if (newItemData.initialQuantity > 0) {
                 setReceivedItems(prev => [...prev, {
-                    id: newProductWithId.id,
-                    name: newProductWithId.name,
+                    id: newProductId,
+                    name: newProductData.name,
                     quantity: newItemData.initialQuantity,
-                    unit: newProductWithId.unit
+                    unit: newProductData.unit
                 }]);
             }
         } catch (error) {
@@ -158,6 +165,10 @@ export default function EntryPage() {
         setIsAuthDialogOpen(false);
         setIsAddItemSheetOpen(true);
     };
+    
+    const handleRegisterNewItemClick = () => {
+        setIsAuthDialogOpen(true);
+    }
 
     const handleFinalizeEntry = async () => {
         if (receivedItems.length === 0) {
@@ -265,7 +276,11 @@ export default function EntryPage() {
                     <CardHeader>
                         <CardTitle>Itens Recebidos</CardTitle>
                         <div className="flex flex-col md:flex-row items-end gap-2 pt-4">
-                            <ItemSearch onSelectItem={handleSelectSearchItem} searchId="entry-item-search" />
+                            <ItemSearch 
+                                onSelectItem={handleSelectSearchItem} 
+                                searchId="entry-item-search"
+                                onRegisterNewItem={handleRegisterNewItemClick}
+                            />
                             <div className="w-full md:w-24">
                                <label htmlFor="quantity" className="text-sm font-medium">Qtd.</label>
                                <Input id="quantity" type="number" value={quantity} onChange={e => setQuantity(Number(e.target.value))} min="1" />
@@ -301,8 +316,8 @@ export default function EntryPage() {
                                             <TableCell className="font-medium">{item.name}</TableCell>
                                             <TableCell className="text-right">{`${item.quantity} ${item.unit}`}</TableCell>
                                             <TableCell className="text-center">
-                                                <Button variant="link" className="text-red-600 h-auto p-0" onClick={() => handleRemoveFromList(item.id)}>
-                                                  Remover
+                                                <Button variant="ghost" size="icon" className="text-red-600 hover:bg-red-100 h-auto p-0" onClick={() => handleRemoveFromList(item.id)}>
+                                                  <Trash2 className="h-4 w-4" />
                                                 </Button>
                                             </TableCell>
                                         </TableRow>
@@ -334,3 +349,5 @@ export default function EntryPage() {
     </>
   );
 }
+
+    

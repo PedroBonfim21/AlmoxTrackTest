@@ -36,6 +36,7 @@ import {
     AlertDialogContent,
     AlertDialogHeader,
     AlertDialogTitle,
+    AlertDialogFooter,
 } from "@/components/ui/alert-dialog"
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
@@ -226,6 +227,7 @@ export default function ResponsibilityRequestForm() {
                                         <TableHeader>
                                             <TableRow>
                                                 <TableHead>Item</TableHead>
+                                                <TableHead>Nº Patrimônio</TableHead>
                                                 <TableHead className="w-[100px] text-right">Qtd</TableHead>
                                                 <TableHead className="w-[100px] text-center">Ação</TableHead>
                                             </TableRow>
@@ -233,7 +235,7 @@ export default function ResponsibilityRequestForm() {
                                         <TableBody>
                                             {requestedItems.length === 0 ? (
                                                 <TableRow>
-                                                    <TableCell colSpan={3} className="text-center text-muted-foreground">
+                                                    <TableCell colSpan={4} className="text-center text-muted-foreground">
                                                         Nenhum item adicionado.
                                                     </TableCell>
                                                 </TableRow>
@@ -241,6 +243,7 @@ export default function ResponsibilityRequestForm() {
                                                 requestedItems.map(item => (
                                                     <TableRow key={item.id}>
                                                         <TableCell className="font-medium">{item.name}</TableCell>
+                                                        <TableCell>{item.patrimony}</TableCell>
                                                         <TableCell className="text-right">{`${item.quantity} ${item.unit}`}</TableCell>
                                                         <TableCell className="text-center">
                                                             <Button variant="ghost" size="icon" className="text-red-600 hover:bg-red-100" onClick={() => handleRemoveItem(item.id)}>
@@ -325,8 +328,8 @@ export default function ResponsibilityRequestForm() {
                              </div>
                             <AlertDialogFooter className="print:hidden">
                                 <AlertDialogCancel onClick={() => setIsConfirmDialogOpen(false)}>Sair</AlertDialogCancel>
-                                <AlertDialogAction onClick={handlePrintAndFinalize} disabled={!isTermAccepted}>
-                                    Imprimir
+                                <AlertDialogAction onClick={handlePrintAndFinalize} disabled={!isTermAccepted || isFinalizing}>
+                                    {isFinalizing ? "Finalizando..." : "Imprimir e Finalizar"}
                                 </AlertDialogAction>
                             </AlertDialogFooter>
                         </AlertDialogContent>
@@ -357,3 +360,5 @@ export default function ResponsibilityRequestForm() {
         </>
     );
 }
+
+    

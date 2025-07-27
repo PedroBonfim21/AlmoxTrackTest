@@ -79,41 +79,34 @@ const movementsCollection = collection(db, 'movements');
 export const getProducts = async (filters: ProductFilters = {}): Promise<Product[]> => {
     const { searchTerm, materialType } = filters;
     
-    let constraints: QueryConstraint[] = [];
+    const constraints: QueryConstraint[] = [];
 
     if (materialType) {
         constraints.push(where('type', '==', materialType));
     }
-    
-    // Add orderBy name_lowercase by default for consistent ordering.
-    constraints.push(orderBy('name_lowercase'));
 
-    if (searchTerm) {
+    if (searchTerm && searchTerm.length > 0) {
         const lowercasedTerm = searchTerm.toLowerCase();
-        // Overwrite the constraints for search
-        constraints = [
-            where('name_lowercase', '>=', lowercasedTerm),
-            where('name_lowercase', '<=', lowercasedTerm + '\uf8ff'),
-            orderBy('name_lowercase'),
-        ];
-        if (materialType) {
-            constraints.push(where('type', '==', materialType));
-        }
+        constraints.push(where('name_lowercase', '>=', lowercasedTerm));
+        constraints.push(where('name_lowercase', '<=', lowercasedTerm + '\uf8ff'));
     }
     
-    constraints.push(limit(25));
+    // Always order by name for consistent results
+    constraints.push(orderBy('name_lowercase'));
+
+    if (!searchTerm) { // Limit results only when not searching
+        constraints.push(limit(50));
+    }
+
 
     const finalQuery = query(productsCollection, ...constraints);
     const snapshot = await getDocs(finalQuery);
 
-    let products: Product[] = [];
-    snapshot.forEach(doc => {
-        products.push({ id: doc.id, ...doc.data() } as Product);
-    });
+    let products: Product[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
 
-    // If name search returns nothing, try searching by code
+    // If name search returns nothing and it's a search term, try searching by code
     if (searchTerm && products.length === 0) {
-        let codeConstraints: QueryConstraint[] = [
+        const codeConstraints: QueryConstraint[] = [
             where('code', '==', searchTerm)
         ];
         if (materialType) {
@@ -121,9 +114,7 @@ export const getProducts = async (filters: ProductFilters = {}): Promise<Product
         }
         const codeQuery = query(productsCollection, ...codeConstraints);
         const codeSnapshot = await getDocs(codeQuery);
-        codeSnapshot.forEach(doc => {
-            products.push({ id: doc.id, ...doc.data() } as Product);
-        });
+        products = codeSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
     }
 
     return products;
@@ -274,8 +265,6 @@ export const getMovements = async (filters: MovementFilters = {}): Promise<Movem
         constraints.push(where('department', '==', department));
     }
     
-    // This filter cannot be done in the same query as other range filters.
-    // It's applied client-side after the main query.
     if (materialType && products) {
         const productIds = products
             .filter((p) => p.type === materialType)
@@ -284,7 +273,6 @@ export const getMovements = async (filters: MovementFilters = {}): Promise<Movem
         if (productIds.length > 0) {
             constraints.push(where('productId', 'in', productIds));
         } else {
-            // If no products match the material type, return no movements.
             return [];
         }
     }
@@ -296,11 +284,10 @@ export const getMovements = async (filters: MovementFilters = {}): Promise<Movem
 };
 
 export const getMovementsForItem = async (productId: string): Promise<Movement[]> => {
-    const q = query(movementsCollection, where('productId', '==', productId));
+    const q = query(movementsCollection, where('productId', '==', productId), orderBy('date', 'desc'));
     const snapshot = await getDocs(q);
     const movements = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Movement));
-    // Sort by date descending
-    return movements.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    return movements;
 }
 
 export const addMovement = async (movementData: Omit<Movement, 'id'>): Promise<string> => {
@@ -308,10 +295,4 @@ export const addMovement = async (movementData: Omit<Movement, 'id'>): Promise<s
     return docRef.id;
 };
 
-export const updateProductQuantityOnEntry = async (productId: string, quantity: number): Promise<void> => {
-    const productRef = doc(db, 'products', productId);
-    await updateDoc(productRef, {
-        quantity: increment(quantity)
-    });
-};
-
+    
