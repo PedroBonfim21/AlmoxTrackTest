@@ -1,6 +1,6 @@
 
 import { db, storage } from './firebase';
-import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, query, where, runTransaction, getDoc, increment, writeBatch, QueryConstraint, or } from 'firebase/firestore';
+import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, query, where, runTransaction, getDoc, increment, writeBatch, QueryConstraint, or, orderBy, limit } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { parseISO } from 'date-fns';
 
@@ -85,25 +85,35 @@ export const getProducts = async (filters: ProductFilters = {}): Promise<Product
     }
 
     if (searchTerm) {
-        const term = searchTerm.toLowerCase();
-        // Firestore doesn't support case-insensitive `startsWith` queries natively.
-        // A common workaround is to store a lowercase version of the field.
-        // For this project, we'll use a >= and <= trick for a "starts with" search.
-        // This is case-sensitive. For a full-text search solution, a third-party
-        // service like Algolia or Typesense integrated with Firebase Extensions is recommended.
-        constraints.push(
-            or(
-                where('name', '>=', searchTerm),
-                where('name', '<=', searchTerm + '\uf8ff'),
-                where('code', '==', searchTerm)
-            )
-        );
+        // This is a common and effective way to implement "starts-with" search in Firestore.
+        // It finds all documents where the 'name' field is greater than or equal to the search term
+        // and less than the search term followed by a high-unicode character.
+        constraints.push(where('name', '>=', searchTerm));
+        constraints.push(where('name', '<=', searchTerm + '\uf8ff'));
     }
     
+    // Add a default ordering to make queries more consistent
+    constraints.push(orderBy('name'));
+    constraints.push(limit(25)); // Limit results to prevent fetching too much data
+
     const finalQuery = query(productsCollection, ...constraints);
     const snapshot = await getDocs(finalQuery);
 
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
+    const products: Product[] = [];
+    snapshot.forEach(doc => {
+        products.push({ id: doc.id, ...doc.data() } as Product);
+    });
+
+    // If search term is a code, try an exact match as a fallback (less common)
+    if (searchTerm && products.length === 0) {
+        const codeQuery = query(productsCollection, where('code', '==', searchTerm));
+        const codeSnapshot = await getDocs(codeQuery);
+        codeSnapshot.forEach(doc => {
+            products.push({ id: doc.id, ...doc.data() } as Product);
+        });
+    }
+
+    return products;
 };
 
 export const addProduct = async (productData: Omit<Product, 'id'>): Promise<string> => {
@@ -291,5 +301,3 @@ export const updateProductQuantityOnEntry = async (productId: string, quantity: 
         quantity: increment(quantity)
     });
 };
-
-    
