@@ -79,21 +79,21 @@ export default function DashboardPage() {
 
     setIsLoading(true);
     try {
-      // Pass filters directly to the backend
-      const [productsData, movementsData, allMovementsForDepartments] = await Promise.all([
-        getProducts(),
+      const productsData = await getProducts();
+      setProducts(productsData);
+
+      const [movementsData, allMovementsForDepartments] = await Promise.all([
         getMovements({
           startDate: startDate.toISOString(),
           endDate: endDate.toISOString(),
           movementType: movementType !== "all" ? movementType : undefined,
           materialType: materialType !== "all" ? materialType : undefined,
           department: department !== "all" ? department : undefined,
-          products: products // Pass products for materialType filtering
+          products: productsData
         }),
-        getMovements() // Fetch all once to populate department filter
+        getMovements() 
       ]);
       
-      setProducts(productsData);
       setMovements(movementsData);
 
       const uniqueDeps = [...new Set(allMovementsForDepartments.map((m) => m.department).filter(Boolean as any))];
@@ -108,7 +108,7 @@ export default function DashboardPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [startDate, endDate, movementType, materialType, department, products, toast]);
+  }, [startDate, endDate, movementType, materialType, department, toast]);
 
   React.useEffect(() => {
     fetchDashboardData();
