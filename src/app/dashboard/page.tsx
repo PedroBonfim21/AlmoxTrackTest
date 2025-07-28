@@ -68,23 +68,27 @@ export default function DashboardPage() {
   const { toast } = useToast();
 
   React.useEffect(() => {
-    setStartDate(subDays(new Date(), 29));
-    setEndDate(new Date());
+    const defaultStartDate = subDays(new Date(), 29);
+    const defaultEndDate = new Date();
+    setStartDate(defaultStartDate);
+    setEndDate(defaultEndDate);
   }, []);
   
   const fetchDashboardData = React.useCallback(async () => {
+    if (!startDate || !endDate) return; // Don't fetch if dates are not set
+
     setIsLoading(true);
     try {
       // Pass filters directly to the backend
       const [productsData, movementsData, allMovementsForDepartments] = await Promise.all([
         getProducts(),
         getMovements({
-          startDate: startDate ? startDate.toISOString() : undefined,
-          endDate: endDate ? endDate.toISOString() : undefined,
+          startDate: startDate.toISOString(),
+          endDate: endDate.toISOString(),
           movementType: movementType !== "all" ? movementType : undefined,
           materialType: materialType !== "all" ? materialType : undefined,
           department: department !== "all" ? department : undefined,
-          products // Pass products for materialType filtering
+          products: products // Pass products for materialType filtering
         }),
         getMovements() // Fetch all once to populate department filter
       ]);
@@ -477,5 +481,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
-    

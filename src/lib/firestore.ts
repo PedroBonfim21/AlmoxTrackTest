@@ -87,17 +87,17 @@ export const getProducts = async (filters: ProductFilters = {}): Promise<Product
 
     if (searchTerm && searchTerm.length > 0) {
         const lowercasedTerm = searchTerm.toLowerCase();
+        // Firestore queries for "starts with"
         constraints.push(where('name_lowercase', '>=', lowercasedTerm));
         constraints.push(where('name_lowercase', '<=', lowercasedTerm + '\uf8ff'));
+        constraints.push(orderBy('name_lowercase'));
+    } else {
+        constraints.push(orderBy('name')); // Default sort
     }
-    
-    // Always order by name for consistent results
-    constraints.push(orderBy('name_lowercase'));
 
     if (!searchTerm) { // Limit results only when not searching
         constraints.push(limit(50));
     }
-
 
     const finalQuery = query(productsCollection, ...constraints);
     const snapshot = await getDocs(finalQuery);
@@ -276,6 +276,9 @@ export const getMovements = async (filters: MovementFilters = {}): Promise<Movem
             return [];
         }
     }
+    
+    // Add default sorting to avoid another potential index error
+    constraints.push(orderBy('date', 'desc'));
 
     const finalQuery = query(movementsCollection, ...constraints);
     const snapshot = await getDocs(finalQuery);
@@ -284,7 +287,7 @@ export const getMovements = async (filters: MovementFilters = {}): Promise<Movem
 };
 
 export const getMovementsForItem = async (productId: string): Promise<Movement[]> => {
-    const q = query(movementsCollection, where('productId', '==', productId), orderBy('date', 'desc'));
+    const q = query(movementsCollection, where('productId', '==', productId));
     const snapshot = await getDocs(q);
     const movements = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Movement));
     return movements;
@@ -294,5 +297,3 @@ export const addMovement = async (movementData: Omit<Movement, 'id'>): Promise<s
     const docRef = await addDoc(movementsCollection, movementData);
     return docRef.id;
 };
-
-    

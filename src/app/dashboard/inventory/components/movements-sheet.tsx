@@ -56,7 +56,11 @@ export function MovementsSheet({ isOpen, onOpenChange, item }: MovementsSheetPro
       const fetchMovements = async () => {
         setIsLoading(true);
         const movements = await getMovementsForItem(item.id);
-        setItemMovements(movements);
+        // Sort movements on the client-side
+        const sortedMovements = movements.sort((a, b) => 
+            parseISO(b.date).getTime() - parseISO(a.date).getTime()
+        );
+        setItemMovements(sortedMovements);
         setIsLoading(false);
       };
       fetchMovements();
