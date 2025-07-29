@@ -1,8 +1,8 @@
-
 import { db, storage } from './firebase';
 import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, query, where, runTransaction, getDoc, increment, writeBatch, QueryConstraint, or, orderBy, limit } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { getStorage, ref, uploadString, getDownloadURL } from "firebase/storage";
 import { parseISO } from 'date-fns';
+
 
 // Product Type
 export type Product = {
@@ -135,11 +135,41 @@ export const deleteProduct = async (productId: string): Promise<void> => {
     await deleteDoc(productDoc);
 };
 
-export const uploadImage = async (file: File): Promise<string> => {
-    const storageRef = ref(storage, `products/${Date.now()}_${file.name}`);
-    await uploadBytes(storageRef, file);
-    const downloadURL = await getDownloadURL(storageRef);
+type ImageObject = {
+  base64: string;
+  fileName: string;
+  contentType: string;
+};
+
+export const uploadImage = async (imageObject: ImageObject) => {
+  // Se o objeto de imagem não existir, retorna uma URL padrão ou nula
+  if (!imageObject || !imageObject.base64) {
+    return "https://placehold.co/40x40.png";
+  }
+
+  try {
+    // 1. Desestrutura o objeto recebido do formulário
+    const { base64, fileName, contentType } = imageObject;
+    
+    const storage = getStorage();
+    const storageRef = ref(storage, `products/${Date.now()}_${fileName}`);
+
+    // 2. Define os metadados, que são cruciais para o Firebase reconhecer o arquivo como imagem
+    const metadata = {
+      contentType: contentType,
+    };
+    
+    // 3. Usa 'uploadString' com o formato 'data_url' e os metadados
+    const snapshot = await uploadString(storageRef, base64, 'data_url', metadata);
+    
+    // 4. Obtém e retorna a URL pública de download
+    const downloadURL = await getDownloadURL(snapshot.ref);
     return downloadURL;
+
+  } catch (error) {
+    console.error("Erro ao fazer upload da imagem com Base64:", error);
+    throw error;
+  }
 };
 
 
