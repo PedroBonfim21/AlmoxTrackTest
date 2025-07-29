@@ -42,6 +42,19 @@ import { AdminSyncAuthDialog } from "./components/admin-sync-auth-dialog";
 import { usePathname } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import { syncToSheet } from "@/ai/flows/sync-sheet-flow";
+import { getAuth, onAuthStateChanged } from "firebase/auth";
+
+const auth = getAuth(); // Pegue sua instância de autenticação
+
+onAuthStateChanged(auth, (user) => {
+  if (user) {
+    // O usuário está logado.
+    console.log("VERIFICAÇÃO: Usuário está logado. UID:", user.uid);
+  } else {
+    // O usuário está deslogado.
+    console.log("VERIFICAÇÃO: Nenhum usuário logado.");
+  }
+});
 
 // Mock user role - 'Admin' or 'Operator'
 const currentUserRole = "Admin";
