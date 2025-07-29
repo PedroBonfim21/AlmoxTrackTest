@@ -142,44 +142,50 @@ const handleAddItem = React.useCallback(async (newItemData: {
   }
 }, [fetchProducts, toast, searchTerm]);
   
-  const handleUpdateItem = async (updatedItemData: any) => {
-    if (!selectedItem) return;
-    setIsLoading(true);
-    try {
-        let imageUrl = selectedItem.image;
-        if (updatedItemData.image) {
-            imageUrl = await uploadImage(updatedItemData.image);
-        }
+const handleUpdateItem = async (updatedItemData: any) => {
+  if (!selectedItem) return;
+  setIsLoading(true);
+  try {
+    let imageUrl = selectedItem.image; // 1. Começa assumindo que vamos manter a imagem antiga.
 
-        const updateData: Partial<Product> = {
-            name: updatedItemData.name,
-            name_lowercase: updatedItemData.name.toLowerCase(),
-            type: updatedItemData.materialType,
-            code: updatedItemData.itemCode,
-            patrimony: updatedItemData.materialType === 'permanente' ? updatedItemData.patrimony : 'N/A',
-            unit: updatedItemData.unit,
-            quantity: updatedItemData.quantity,
-            category: updatedItemData.category,
-            image: imageUrl,
-        };
-        
-        await updateProduct(selectedItem.id, updateData);
-        
-        toast({
-          title: "Item Atualizado!",
-          description: `${updatedItemData.name} foi atualizado com sucesso.`,
-        });
-        fetchProducts(searchTerm); // Refresh the product list
-    } catch(error) {
-         toast({
-            title: "Erro ao Atualizar Item",
-            description: "Não foi possível atualizar o item. Tente novamente.",
-            variant: "destructive"
-        });
-    } finally {
-        setIsLoading(false);
+    // 2. VERIFICA SE UMA NOVA IMAGEM FOI ENVIADA.
+    // Uma nova imagem será o nosso objeto { base64: "...", ... }, enquanto a antiga é uma string de URL.
+    if (updatedItemData.image && typeof updatedItemData.image === 'object') {
+      // Se for um objeto, significa que o usuário escolheu um novo arquivo.
+      // Então, fazemos o upload.
+      imageUrl = await uploadImage(updatedItemData.image);
     }
-  };
+    // Se 'updatedItemData.image' não for um objeto, ele simplesmente ignora e mantém a URL antiga.
+
+    const updateData: Partial<Product> = {
+        name: updatedItemData.name,
+        name_lowercase: updatedItemData.name.toLowerCase(),
+        type: updatedItemData.materialType,
+        code: updatedItemData.itemCode,
+        patrimony: updatedItemData.materialType === 'permanente' ? updatedItemData.patrimony : 'N/A',
+        unit: updatedItemData.unit,
+        quantity: updatedItemData.quantity,
+        category: updatedItemData.category,
+        image: imageUrl, // 3. Salva a URL correta (a nova ou a antiga mantida).
+    };
+    
+    await updateProduct(selectedItem.id, updateData);
+    
+    toast({
+      title: "Item Atualizado!",
+      description: `${updatedItemData.name} foi atualizado com sucesso.`,
+    });
+    fetchProducts(searchTerm);
+  } catch(error) {
+     toast({
+        title: "Erro ao Atualizar Item",
+        description: "Não foi possível atualizar o item. Tente novamente.",
+        variant: "destructive"
+     });
+  } finally {
+     setIsLoading(false);
+  }
+};
   
   const handleDeleteItem = async (productId: string) => {
     setIsLoading(true);
