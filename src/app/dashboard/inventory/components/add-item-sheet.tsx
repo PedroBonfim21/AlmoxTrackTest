@@ -1,11 +1,10 @@
-
 "use client";
-
-import * as React from "react";
+import * as z from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
+import { useState, useRef, useEffect } from "react";
 import { Upload } from "lucide-react";
+import Image from "next/image";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -34,8 +33,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import Image from "next/image";
 
+// 1. Modificar o Schema do Zod
 const formSchema = z.object({
   name: z.string().min(1, "O nome do item é obrigatório."),
   materialType: z.enum(["consumo", "permanente"]),
@@ -44,7 +43,11 @@ const formSchema = z.object({
   unit: z.string().min(1, "A unidade é obrigatória."),
   initialQuantity: z.coerce.number().min(0, "A quantidade deve ser um número positivo."),
   category: z.string().min(1, "A categoria é obrigatória."),
-  image: z.any().optional(),
+  image: z.object({
+    base64: z.string(),
+    fileName: z.string(),
+    contentType: z.string(),
+  }).optional(), // Agora aceita uma string Base64
 });
 
 type AddItemFormValues = z.infer<typeof formSchema>;
@@ -57,8 +60,8 @@ interface AddItemSheetProps {
 
 export function AddItemSheet({ isOpen, onOpenChange, onItemAdded }: AddItemSheetProps) {
   const { toast } = useToast();
-  const [imagePreview, setImagePreview] = React.useState<string | null>(null);
-  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const form = useForm<AddItemFormValues>({
     resolver: zodResolver(formSchema),
@@ -70,39 +73,49 @@ export function AddItemSheet({ isOpen, onOpenChange, onItemAdded }: AddItemSheet
       unit: "",
       initialQuantity: 0,
       category: "",
-      image: null,
+      image: undefined,
     },
   });
 
   const materialType = form.watch("materialType");
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (materialType === "consumo") {
       form.setValue("patrimony", "");
     }
   }, [materialType, form]);
-  
-  React.useEffect(() => {
+
+  useEffect(() => {
     if (!isOpen) {
       form.reset();
       setImagePreview(null);
     }
   }, [isOpen, form]);
 
-
+  // 2. Converter a Imagem para Base64
   const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string);
-        form.setValue("image", file); // Set the file object itself
+  const file = event.target.files?.[0];
+  if (file) {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64String = reader.result as string;
+
+      // Cria o objeto com todas as informações necessárias
+      const imageObject = {
+        base64: base64String,
+        fileName: file.name,
+        contentType: file.type,
       };
-      reader.readAsDataURL(file);
-    }
-  };
+
+      setImagePreview(base64String); // A pré-visualização continua usando a string
+      form.setValue("image", imageObject); // Salva o OBJETO completo no formulário
+    };
+    reader.readAsDataURL(file);
+  }
+};
 
   const onSubmit = (data: AddItemFormValues) => {
+    console.log("Payload enviado:", data); // Exibe o payload no console
     onItemAdded(data);
     onOpenChange(false);
   };
@@ -120,8 +133,8 @@ export function AddItemSheet({ isOpen, onOpenChange, onItemAdded }: AddItemSheet
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 py-6">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="md:col-span-1 space-y-2">
-                 <FormLabel>Imagem do Produto</FormLabel>
-                <div 
+                <FormLabel>Imagem do Produto</FormLabel>
+                <div
                   className="relative flex flex-col items-center justify-center w-full h-48 border-2 border-dashed rounded-lg cursor-pointer hover:bg-muted"
                   onClick={() => fileInputRef.current?.click()}
                 >
@@ -132,8 +145,14 @@ export function AddItemSheet({ isOpen, onOpenChange, onItemAdded }: AddItemSheet
                     className="hidden"
                     accept="image/*"
                   />
+                  {/* 4. Exibir a Imagem Base64 */}
                   {imagePreview ? (
-                     <Image src={imagePreview} alt="Preview" layout="fill" objectFit="cover" className="rounded-lg" />
+                    <Image
+                      src={imagePreview}
+                      alt="Preview"
+                      fill
+                      className="rounded-lg object-cover"
+                    />
                   ) : (
                     <div className="text-center text-muted-foreground">
                       <Upload className="mx-auto h-8 w-8 mb-2" />
@@ -179,66 +198,66 @@ export function AddItemSheet({ isOpen, onOpenChange, onItemAdded }: AddItemSheet
                 />
               </div>
             </div>
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                 <FormField
-                  control={form.control}
-                  name="itemCode"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Código do Item (Opcional)</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Ex: CAN-AZ-001" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="patrimony"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Nº Patrimonial</FormLabel>
-                      <FormControl>
-                        <Input 
-                          placeholder="Ex: 123456" 
-                          {...field} 
-                          disabled={materialType === 'consumo'}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-             </div>
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                 <FormField
-                  control={form.control}
-                  name="unit"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Unidade</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Ex: Un, Cx, Resma" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                 <FormField
-                  control={form.control}
-                  name="initialQuantity"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Quantidade Inicial</FormLabel>
-                      <FormControl>
-                        <Input type="number" placeholder="0" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-             </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <FormField
+                control={form.control}
+                name="itemCode"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Código do Item (Opcional)</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Ex: CAN-AZ-001" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="patrimony"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Nº Patrimonial</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Ex: 123456"
+                        {...field}
+                        disabled={materialType === "consumo"}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <FormField
+                control={form.control}
+                name="unit"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Unidade</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Ex: Un, Cx, Resma" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="initialQuantity"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Quantidade Inicial</FormLabel>
+                    <FormControl>
+                      <Input type="number" placeholder="0" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
             <FormField
               control={form.control}
               name="category"
