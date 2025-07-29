@@ -83,55 +83,64 @@ export default function InventoryPage() {
     };
   }, [searchTerm, fetchProducts]);
 
-  const handleAddItem = React.useCallback(async (newItemData: any) => {
-    setIsLoading(true);
-    try {
-        let imageUrl = "https://placehold.co/40x40.png";
-        if (newItemData.image) {
-            imageUrl = await uploadImage(newItemData.image);
-        }
+const handleAddItem = React.useCallback(async (newItemData: {
+  name: string;
+  unit: string;
+  category: string;
+  materialType: "permanente" | "consumo";
+  initialQuantity: number;
+  image?: { base64: string; fileName: string; contentType: string } | undefined;
+  itemCode?: string;
+  patrimony?: string;
+}) => {
+  setIsLoading(true);
+  try {
+    let imageUrl = "https://placehold.co/40x40.png";
 
-        const itemCode = newItemData.itemCode?.trim() || `new-${Date.now()}`;
-        
-        const newProduct: Omit<Product, 'id'> = {
-          name: newItemData.name,
-          name_lowercase: newItemData.name.toLowerCase(),
-          code: itemCode,
-          patrimony: newItemData.materialType === 'permanente' ? newItemData.patrimony : 'N/A',
-          type: newItemData.materialType,
-          quantity: newItemData.initialQuantity || 0,
-          unit: newItemData.unit,
-          category: newItemData.category,
-          image: imageUrl,
-        };
-
-        const newProductId = await addProduct(newProduct);
-
-        if(newProduct.quantity > 0) {
-            await addMovement({
-                productId: newProductId,
-                date: new Date().toISOString(),
-                type: 'Entrada',
-                quantity: newProduct.quantity,
-                responsible: 'Sistema' // Or a logged in user
-            });
-        }
-
-        toast({
-            title: "Item Adicionado!",
-            description: `${newProduct.name} foi adicionado ao inventário.`,
-        });
-        fetchProducts(searchTerm); // Refresh the product list
-    } catch(error) {
-        toast({
-            title: "Erro ao Adicionar Item",
-            description: "Não foi possível adicionar o item. Tente novamente.",
-            variant: "destructive"
-        });
-    } finally {
-        setIsLoading(false);
+    if (newItemData.image) {
+      imageUrl = await uploadImage(newItemData.image);
     }
-  }, [fetchProducts, toast, searchTerm]);
+
+    const itemCode = newItemData.itemCode?.trim() || `new-${Date.now()}`;
+
+    const newProduct: Omit<Product, 'id'> = {
+      name: newItemData.name,
+      name_lowercase: newItemData.name.toLowerCase(),
+      code: itemCode,
+      patrimony: newItemData.materialType === 'permanente' ? (newItemData.patrimony ?? '') : 'N/A',
+      type: newItemData.materialType,
+      quantity: newItemData.initialQuantity || 0,
+      unit: newItemData.unit,
+      category: newItemData.category,
+      image: imageUrl,
+    };
+
+    const newProductId = await addProduct(newProduct);
+    if (newProduct.quantity > 0) {
+      await addMovement({
+        productId: newProductId,
+        date: new Date().toISOString(),
+        type: 'Entrada',
+        quantity: newProduct.quantity,
+        responsible: 'Sistema'
+      });
+    }
+
+    toast({
+      title: "Item Adicionado!",
+      description: `${newProduct.name} foi adicionado ao inventário.`,
+    });
+    fetchProducts(searchTerm);
+  } catch (error) {
+    toast({
+      title: "Erro ao Adicionar Item",
+      description: "Não foi possível adicionar o item. Tente novamente.",
+      variant: "destructive"
+    });
+  } finally {
+    setIsLoading(false);
+  }
+}, [fetchProducts, toast, searchTerm]);
   
   const handleUpdateItem = async (updatedItemData: any) => {
     if (!selectedItem) return;
