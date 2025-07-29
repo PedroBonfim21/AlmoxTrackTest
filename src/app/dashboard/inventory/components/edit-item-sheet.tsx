@@ -98,16 +98,25 @@ export function EditItemSheet({ isOpen, onOpenChange, onItemUpdated, item }: Edi
 
 
   const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string);
-        form.setValue("image", file);
+  const file = event.target.files?.[0];
+  if (file) {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64String = reader.result as string;
+
+      // Cria o objeto com todas as informações necessárias
+      const imageObject = {
+        base64: base64String,
+        fileName: file.name,
+        contentType: file.type,
       };
-      reader.readAsDataURL(file);
-    }
-  };
+
+      setImagePreview(base64String); // A pré-visualização continua usando a string
+      form.setValue("image", imageObject); // Salva o OBJETO completo no formulário
+    };
+    reader.readAsDataURL(file);
+  }
+};
 
   const onSubmit = (data: EditItemFormValues) => {
     onItemUpdated(data);
@@ -139,8 +148,15 @@ export function EditItemSheet({ isOpen, onOpenChange, onItemUpdated, item }: Edi
                     className="hidden"
                     accept="image/*"
                   />
+                  {/* 4. Exibir a Imagem Base64 */}
                   {imagePreview ? (
-                     <Image src={imagePreview} alt="Preview" layout="fill" objectFit="cover" className="rounded-lg" />
+                    <Image
+                      src={imagePreview}
+                      alt="Preview"
+                      fill
+                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                      className="rounded-lg object-cover"
+                    />
                   ) : (
                     <div className="text-center text-muted-foreground">
                       <Upload className="mx-auto h-8 w-8 mb-2" />
