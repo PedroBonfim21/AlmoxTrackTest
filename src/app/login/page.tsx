@@ -14,8 +14,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Warehouse, Loader2 } from "lucide-react";
-import { auth } from "@/lib/firebase"; // Importe o auth
-import { useToast } from "@/hooks/use-toast"; // Importe o useToast
+import { auth } from "@/lib/firebase";
+import { useToast } from "@/hooks/use-toast";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -33,8 +33,9 @@ export default function LoginPage() {
       toast({
         title: "Login bem-sucedido!",
         description: "Redirecionando para o dashboard.",
+        variant: "success",
       });
-      router.push("/dashboard/inventory"); // Redireciona para a página de inventário
+      router.push("/dashboard/inventory");
     } catch (error: any) {
       console.error("Erro de login:", error);
       toast({

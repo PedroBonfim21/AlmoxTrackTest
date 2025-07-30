@@ -76,7 +76,7 @@ export default function InventoryPage() {
   React.useEffect(() => {
     const handler = setTimeout(() => {
       fetchProducts(searchTerm);
-    }, 500); // Debounce search
+    }, 500);
 
     return () => {
       clearTimeout(handler);
@@ -146,16 +146,10 @@ const handleUpdateItem = async (updatedItemData: any) => {
   if (!selectedItem) return;
   setIsLoading(true);
   try {
-    let imageUrl = selectedItem.image; // 1. Começa assumindo que vamos manter a imagem antiga.
-
-    // 2. VERIFICA SE UMA NOVA IMAGEM FOI ENVIADA.
-    // Uma nova imagem será o nosso objeto { base64: "...", ... }, enquanto a antiga é uma string de URL.
+    let imageUrl = selectedItem.image;
     if (updatedItemData.image && typeof updatedItemData.image === 'object') {
-      // Se for um objeto, significa que o usuário escolheu um novo arquivo.
-      // Então, fazemos o upload.
       imageUrl = await uploadImage(updatedItemData.image);
     }
-    // Se 'updatedItemData.image' não for um objeto, ele simplesmente ignora e mantém a URL antiga.
 
     const updateData: Partial<Product> = {
         name: updatedItemData.name,
@@ -166,7 +160,7 @@ const handleUpdateItem = async (updatedItemData: any) => {
         unit: updatedItemData.unit,
         quantity: updatedItemData.quantity,
         category: updatedItemData.category,
-        image: imageUrl, // 3. Salva a URL correta (a nova ou a antiga mantida).
+        image: imageUrl,
     };
     
     await updateProduct(selectedItem.id, updateData);
@@ -195,7 +189,7 @@ const handleUpdateItem = async (updatedItemData: any) => {
             title: "Item Excluído!",
             description: "O item foi removido do inventário.",
         });
-        fetchProducts(searchTerm); // Refresh the product list
+        fetchProducts(searchTerm);
     } catch(error) {
         toast({
             title: "Erro ao Excluir Item",
