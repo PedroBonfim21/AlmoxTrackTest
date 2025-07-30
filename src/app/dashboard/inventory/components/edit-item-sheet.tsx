@@ -43,10 +43,22 @@ const formSchema = z.object({
   patrimony: z.string().optional(),
   unit: z.string().min(1, "A unidade é obrigatória."),
   quantity: z.coerce.number().min(0, "A quantidade deve ser um número positivo."),
-  category: z.string().min(1, "A categoria é obrigatória."),
   reference: z.string().min(1, "A referência é obrigatória."),
+  category: z.string().min(1, "A seleção da categoria é obrigatória."),
+  otherCategory: z.string().optional(),
   image: z.any().optional(),
+}).refine(data => {
+  // Se a categoria for 'Outro', o campo 'otherCategory' se torna obrigatório.
+  if (data.category === 'Outro') {
+    return data.otherCategory && data.otherCategory.length > 0;
+  }
+  return true;
+}, {
+  // Mensagem de erro se a validação falhar
+  message: "Por favor, especifique a categoria.",
+  path: ["otherCategory"], // O erro aparecerá no campo 'otherCategory'
 });
+
 
 type EditItemFormValues = z.infer<typeof formSchema>;
 
@@ -67,22 +79,36 @@ export function EditItemSheet({ isOpen, onOpenChange, onItemUpdated, item }: Edi
   });
   
   React.useEffect(() => {
-    if (item) {
-        form.reset({
-            name: item.name,
-            materialType: item.type,
-            itemCode: item.code,
-            patrimony: item.patrimony === 'N/A' ? '' : item.patrimony,
-            unit: item.unit,
-            quantity: item.quantity,
-            category: item.category,
-            reference: item.reference,
-            image: null,
-        });
-        setImagePreview(item.image);
+    if (item && isOpen) {
+      // Lista de categorias padrão que existem no seu <Select>
+      const standardCategories = ['Escritório', 'Limpeza'];
+      
+      // Verifica se a categoria do item é uma das padrões
+      const isStandardCategory = standardCategories.includes(item.category);
+
+      form.reset({
+        name: item.name,
+        materialType: item.type,
+        itemCode: item.code,
+        patrimony: item.patrimony === 'N/A' ? '' : item.patrimony,
+        unit: item.unit,
+        quantity: item.quantity,
+        reference: item.reference,
+        
+        // LÓGICA CORRIGIDA AQUI:
+        // Se for uma categoria padrão, usa o valor dela.
+        // Se não for, define o select como 'Outro' e preenche
+        // o campo de texto 'otherCategory' com o valor customizado.
+        category: isStandardCategory ? item.category : 'Outro',
+        otherCategory: isStandardCategory ? '' : item.category,
+        
+        image: null,
+      });
+      setImagePreview(item.image);
     }
   }, [item, form, isOpen]);
 
+  const categoryValue = form.watch("category");
   const materialType = form.watch("materialType");
 
   React.useEffect(() => {
@@ -266,19 +292,47 @@ export function EditItemSheet({ isOpen, onOpenChange, onItemUpdated, item }: Edi
                   />
                </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <FormField
-                control={form.control}
-                name="category"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Categoria</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Ex: Escritório, Limpeza" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
+              <>
+                <FormField
+                  control={form.control}
+                  name="category"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Categoria</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione uma categoria" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="Escritório">Escritório</SelectItem>
+                          <SelectItem value="Limpeza">Limpeza</SelectItem>
+                          <SelectItem value="substituir">Para adicionar uma nova categoria</SelectItem>
+                          <SelectItem value="Outro">Outro</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                {/* Este campo só aparece se 'Outro' for selecionado */}
+                {categoryValue === 'Outro' && (
+                  <FormField
+                    control={form.control}
+                    name="otherCategory"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Especifique a Categoria</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Digite o nome da nova categoria" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                 )}
-              />
+              </>
               <FormField
                 control={form.control}
                 name="reference"
