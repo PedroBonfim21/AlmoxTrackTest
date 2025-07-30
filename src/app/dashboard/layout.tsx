@@ -44,7 +44,7 @@ import { AdminSyncAuthDialog } from "./components/admin-sync-auth-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { syncToSheet } from "@/ai/flows/sync-sheet-flow";
 import { auth } from "@/lib/firebase";
-
+import Image from "next/image";
 // Mock user role - 'Admin' or 'Operator'
 const currentUserRole = "Admin";
 
@@ -152,12 +152,23 @@ export default function DashboardLayout({
         <SidebarHeader
         className="mb-3 ml-5"
         >
+          <Image
+            src="/LOGO.png"
+            width={500}
+            height={40}
+            alt="SESTRANS-Goiana"
+          />
           <div className="flex items-center gap-2 p-2">
             <Warehouse className="w-8 h-8 text-primary" />
-            <span className="text-xl font-semibold">AlmoxTrack</span>
+            <span className="text-xl font-semibold mt-1">AlmoxTrack</span>
           </div>
         </SidebarHeader>
-        <SidebarContent>
+        <hr 
+          className="mx-6"
+        />
+        <SidebarContent
+          className="mt-4"
+        >
           <SidebarMenu>
             {navItems.map((item) => (
               <SidebarMenuItem key={item.label}>
