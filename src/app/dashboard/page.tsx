@@ -96,7 +96,7 @@ export default function DashboardPage() {
       
       setMovements(movementsData);
 
-      const uniqueDeps = [...new Set(allMovementsForDepartments.map((m) => m.department).filter(Boolean as any))];
+      const uniqueDeps = [...new Set(allMovementsForDepartments.map((m) => m.department))].filter((dep): dep is string => typeof dep === 'string');
       setAllDepartments(uniqueDeps);
 
     } catch (error) {
