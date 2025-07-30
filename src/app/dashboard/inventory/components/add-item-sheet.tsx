@@ -42,13 +42,24 @@ const formSchema = z.object({
   patrimony: z.string().optional(),
   unit: z.string().min(1, "A unidade é obrigatória."),
   initialQuantity: z.coerce.number().min(0, "A quantidade deve ser um número positivo."),
-  category: z.string().min(1, "A categoria é obrigatória."),
+  category: z.string().min(1, "A seleção da categoria é obrigatória."),
+  otherCategory: z.string().optional(),
   image: z.object({
     base64: z.string(),
     fileName: z.string(),
     contentType: z.string(),
   }).optional(), // Agora aceita uma string Base64
   reference: z.string().min(1, "A referência é obrigatória."),
+}).refine(data => {
+  // Se a categoria for 'Outro', o campo 'otherCategory' se torna obrigatório.
+  if (data.category === 'Outro') {
+    return data.otherCategory && data.otherCategory.length > 0;
+  }
+  return true;
+}, {
+  // Mensagem de erro se a validação falhar
+  message: "Por favor, especifique a categoria.",
+  path: ["otherCategory"], // O erro aparecerá no campo 'otherCategory'
 });
 
 type AddItemFormValues = z.infer<typeof formSchema>;
@@ -63,7 +74,7 @@ export function AddItemSheet({ isOpen, onOpenChange, onItemAdded }: AddItemSheet
   const { toast } = useToast();
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
+  
   const form = useForm<AddItemFormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -78,7 +89,7 @@ export function AddItemSheet({ isOpen, onOpenChange, onItemAdded }: AddItemSheet
       reference: "",
     },
   });
-
+  const categoryValue = form.watch("category");
   const materialType = form.watch("materialType");
 
   useEffect(() => {
@@ -265,19 +276,48 @@ export function AddItemSheet({ isOpen, onOpenChange, onItemAdded }: AddItemSheet
               />
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <FormField
-                control={form.control}
-                name="category"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Categoria</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Ex: Escritório, Limpeza" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
+              <>
+                <FormField
+                  control={form.control}
+                  name="category"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Categoria</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione uma categoria" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="Escritório">Escritório</SelectItem>
+                          <SelectItem value="Limpeza">Limpeza</SelectItem>
+                          <SelectItem value="substituir">Para adicionar uma nova categoria</SelectItem>
+                          <SelectItem value="Outro">Outro</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Este campo só aparece se 'Outro' for selecionado */}
+                {categoryValue === 'Outro' && (
+                  <FormField
+                    control={form.control}
+                    name="otherCategory"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Especifique a Categoria</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Digite o nome da nova categoria" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                 )}
-              />
+              </>
               <FormField
                 control={form.control}
                 name="reference"
