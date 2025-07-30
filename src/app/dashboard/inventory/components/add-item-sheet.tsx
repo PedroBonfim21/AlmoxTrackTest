@@ -48,6 +48,7 @@ const formSchema = z.object({
     fileName: z.string(),
     contentType: z.string(),
   }).optional(), // Agora aceita uma string Base64
+  reference: z.string().min(1, "A referência é obrigatória."),
 });
 
 type AddItemFormValues = z.infer<typeof formSchema>;
@@ -74,6 +75,7 @@ export function AddItemSheet({ isOpen, onOpenChange, onItemAdded }: AddItemSheet
       initialQuantity: 0,
       category: "",
       image: undefined,
+      reference: "",
     },
   });
 
@@ -258,19 +260,34 @@ export function AddItemSheet({ isOpen, onOpenChange, onItemAdded }: AddItemSheet
                 )}
               />
             </div>
-            <FormField
-              control={form.control}
-              name="category"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Categoria</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Ex: Escritório, Limpeza" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <FormField
+                control={form.control}
+                name="category"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Categoria</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Ex: Escritório, Limpeza" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="reference"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Referência / Localização</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Ex: Prateleira A-03, Gaveta 5" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
             <SheetFooter className="pt-4">
               <SheetClose asChild>
                 <Button type="button" variant="outline">
