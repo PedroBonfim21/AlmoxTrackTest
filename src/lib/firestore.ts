@@ -16,6 +16,7 @@ export type Product = {
     quantity: number;
     unit: string;
     category: string;
+    reference: string;
 };
 
 // Movement Type
