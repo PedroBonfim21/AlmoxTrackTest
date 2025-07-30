@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from "next/link";
@@ -176,7 +177,7 @@ export default function DashboardLayout({
                   asChild
                   isActive={pathname === item.href}
                   tooltip={item.label}
-                  className="h-12 justify-start"
+                  className="justify-start"
                 >
                   <Link href={item.href}>
                     <item.icon />
@@ -190,7 +191,7 @@ export default function DashboardLayout({
                 <SidebarMenuButton
                   onClick={() => setIsAuthDialogOpen(true)}
                   tooltip={"Sincronizar Planilha"}
-                  className="h-12 justify-start"
+                  className="justify-start"
                 >
                   <FileCog />
                   <span>{"Sincronizar Planilha"}</span>
