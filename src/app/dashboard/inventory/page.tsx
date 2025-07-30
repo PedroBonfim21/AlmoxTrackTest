@@ -92,6 +92,7 @@ const handleAddItem = React.useCallback(async (newItemData: {
   itemCode?: string;
   patrimony?: string;
   reference?: string;
+  otherCategory?: string;
 }) => {
   setIsLoading(true);
   try {
@@ -109,6 +110,11 @@ const handleAddItem = React.useCallback(async (newItemData: {
     const generatedCode = await generateNextItemCode(codePrefix);
     // --- FIM DA LÓGICA ---
 
+    const finalCategory = newItemData.category === 'Outro' 
+      ? newItemData.otherCategory 
+      : newItemData.category;
+
+
     const newProduct: Omit<Product, 'id'> = {
       name: newItemData.name,
       name_lowercase: newItemData.name.toLowerCase(),
@@ -117,7 +123,7 @@ const handleAddItem = React.useCallback(async (newItemData: {
       type: newItemData.materialType,
       quantity: newItemData.initialQuantity || 0,
       unit: newItemData.unit,
-      category: newItemData.category,
+      category: finalCategory || '',
       image: imageUrl,
       reference: newItemData.reference || ''
     };
@@ -158,6 +164,10 @@ const handleUpdateItem = async (updatedItemData: any) => {
       imageUrl = await uploadImage(updatedItemData.image);
     }
 
+    const finalCategory = updatedItemData.category === 'Outro' && updatedItemData.otherCategory 
+      ? updatedItemData.otherCategory 
+      : updatedItemData.category;
+
     const updateData: Partial<Product> = {
         name: updatedItemData.name,
         name_lowercase: updatedItemData.name.toLowerCase(),
@@ -166,7 +176,7 @@ const handleUpdateItem = async (updatedItemData: any) => {
         patrimony: updatedItemData.materialType === 'permanente' ? updatedItemData.patrimony : 'N/A',
         unit: updatedItemData.unit,
         quantity: updatedItemData.quantity,
-        category: updatedItemData.category,
+        category: finalCategory,
         image: imageUrl,
     };
     
@@ -175,6 +185,7 @@ const handleUpdateItem = async (updatedItemData: any) => {
     toast({
       title: "Item Atualizado!",
       description: `${updatedItemData.name} foi atualizado com sucesso.`,
+      variant: "success"
     });
     fetchProducts(searchTerm);
   } catch(error) {
