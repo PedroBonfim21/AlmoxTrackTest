@@ -145,7 +145,9 @@ export default function DashboardLayout({
   return (
     <SidebarProvider>
       <Sidebar>
-        <SidebarHeader>
+        <SidebarHeader
+        className="mb-3 "
+        >
           <div className="flex items-center gap-2 p-2">
             <Warehouse className="w-8 h-8 text-primary" />
             <span className="text-xl font-semibold">AlmoxTrack</span>
@@ -159,6 +161,7 @@ export default function DashboardLayout({
                   asChild
                   isActive={pathname === item.href}
                   tooltip={item.label}
+                  className="h-12 justify-start"
                 >
                   <Link href={item.href}>
                     <item.icon />
@@ -172,6 +175,7 @@ export default function DashboardLayout({
                 <SidebarMenuButton
                   onClick={() => setIsAuthDialogOpen(true)}
                   tooltip={"Sincronizar Planilha"}
+                  className="h-12 justify-start"
                 >
                   <FileCog />
                   <span>{"Sincronizar Planilha"}</span>
