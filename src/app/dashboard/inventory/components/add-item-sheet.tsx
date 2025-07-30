@@ -206,9 +206,13 @@ export function AddItemSheet({ isOpen, onOpenChange, onItemAdded }: AddItemSheet
                 name="itemCode"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Código do Item (Opcional)</FormLabel>
+                    <FormLabel>Código do Item</FormLabel>
                     <FormControl>
-                      <Input placeholder="Ex: CAN-AZ-001" {...field} />
+                      <Input
+                        placeholder="Gerado Automaticamente" 
+                        {...field} 
+                        disabled
+                       />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

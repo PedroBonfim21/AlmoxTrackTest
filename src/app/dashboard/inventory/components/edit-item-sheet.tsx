@@ -208,7 +208,11 @@ export function EditItemSheet({ isOpen, onOpenChange, onItemUpdated, item }: Edi
                       <FormItem>
                         <FormLabel>Código do Item (Opcional)</FormLabel>
                         <FormControl>
-                          <Input placeholder="Ex: CAN-AZ-001" {...field} />
+                          <Input
+                            placeholder="Gerado Automaticamente" 
+                            {...field} 
+                            disabled
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
