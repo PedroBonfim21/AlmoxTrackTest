@@ -38,6 +38,13 @@ import {
     AlertDialogTitle,
     AlertDialogFooter,
 } from "@/components/ui/alert-dialog"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
@@ -67,6 +74,7 @@ export default function ResponsibilityRequestForm() {
     const [isConfirmDialogOpen, setIsConfirmDialogOpen] = React.useState(false);
     const [isTermAccepted, setIsTermAccepted] = React.useState(false);
     const [isFinalizing, setIsFinalizing] = React.useState(false);
+    const [department, setDepartment] = React.useState("");
 
     React.useEffect(() => {
         setResponsibilityDate(new Date());
@@ -195,9 +203,20 @@ export default function ResponsibilityRequestForm() {
                                 <Input id="responsible-id" value={responsibleId} onChange={e => setResponsibleId(e.target.value)} />
                             </div>
                         </div>
-                            <div className="space-y-2">
-                            <label htmlFor="responsibility-department" className="text-sm font-medium">Setor/Departamento</label>
-                            <Input id="responsibility-department" value={responsibilityDepartment} onChange={e => setResponsibilityDepartment(e.target.value)} />
+                        <div className="space-y-2">
+                            <label htmlFor="department" className="text-sm font-medium">Setor/Departamento</label>
+                            <Select onValueChange={setDepartment} value={department}>
+                                <SelectTrigger id="department">
+                                    <SelectValue placeholder="Selecione um setor" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="Transito">Trânsito</SelectItem>
+                                    <SelectItem value="Guarda">Guarda</SelectItem>
+                                    <SelectItem value="Transporte">Transporte</SelectItem>
+                                    <SelectItem value="Administracao">Administração</SelectItem>
+                                    <SelectItem value="Financeiro">Financeiro</SelectItem>
+                                </SelectContent>
+                            </Select>
                         </div>
                         <div className="space-y-2">
                             <label htmlFor="project-description" className="text-sm font-medium">Descrição de Uso ou Projeto</label>

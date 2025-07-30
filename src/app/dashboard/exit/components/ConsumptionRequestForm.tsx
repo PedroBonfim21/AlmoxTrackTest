@@ -27,6 +27,13 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
@@ -170,8 +177,19 @@ export default function ConsumptionRequestForm() {
                         </div>
                     </div>
                     <div className="space-y-2">
-                            <label htmlFor="department" className="text-sm font-medium">Setor/Departamento</label>
-                            <Input id="department" value={department} onChange={e => setDepartment(e.target.value)} />
+                        <label htmlFor="department" className="text-sm font-medium">Setor/Departamento</label>
+                        <Select onValueChange={setDepartment} value={department}>
+                            <SelectTrigger id="department">
+                                <SelectValue placeholder="Selecione um setor" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="Transito">Trânsito</SelectItem>
+                                <SelectItem value="Guarda">Guarda</SelectItem>
+                                <SelectItem value="Transporte">Transporte</SelectItem>
+                                <SelectItem value="Administracao">Administração</SelectItem>
+                                <SelectItem value="Financeiro">Financeiro</SelectItem>
+                            </SelectContent>
+                        </Select>
                     </div>
                     <div className="space-y-2">
                         <label htmlFor="purpose" className="text-sm font-medium">Finalidade de Uso</label>

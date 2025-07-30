@@ -58,6 +58,7 @@ export default function ReturnsPage() {
     const [returnedItems, setReturnedItems] = React.useState<ReturnedItem[]>([]);
     const [selectedItem, setSelectedItem] = React.useState<Product | null>(null);
     const [isFinalizing, setIsFinalizing] = React.useState(false);
+    const [department, setDepartment] = React.useState("");
 
     React.useEffect(() => {
         setReturnDate(new Date());
@@ -176,7 +177,18 @@ export default function ReturnsPage() {
                             </div>
                             <div className="space-y-2">
                                 <label htmlFor="returning-department" className="text-sm font-medium">Setor Devolvente</label>
-                                <Input id="returning-department" value={returningDepartment} onChange={e => setReturningDepartment(e.target.value)} />
+                                <Select onValueChange={setDepartment} value={department}>
+                                    <SelectTrigger id="department">
+                                        <SelectValue placeholder="Selecione um setor" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="Transito">Trânsito</SelectItem>
+                                        <SelectItem value="Guarda">Guarda</SelectItem>
+                                        <SelectItem value="Transporte">Transporte</SelectItem>
+                                        <SelectItem value="Administracao">Administração</SelectItem>
+                                        <SelectItem value="Financeiro">Financeiro</SelectItem>
+                                    </SelectContent>
+                                </Select>
                             </div>
                             <div className="space-y-2">
                                 <label htmlFor="return-reason" className="text-sm font-medium">Motivo</label>
