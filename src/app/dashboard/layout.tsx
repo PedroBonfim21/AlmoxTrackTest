@@ -146,7 +146,7 @@ export default function DashboardLayout({
     <SidebarProvider>
       <Sidebar>
         <SidebarHeader
-        className="mb-3 "
+        className="mb-3 ml-5"
         >
           <div className="flex items-center gap-2 p-2">
             <Warehouse className="w-8 h-8 text-primary" />
@@ -185,7 +185,9 @@ export default function DashboardLayout({
           </SidebarMenu>
         </SidebarContent>
         <SidebarSeparator />
-        <SidebarFooter>
+        <SidebarFooter
+        className="mb-5 mt-1"
+        >
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="justify-start w-full h-auto px-2 py-2">
