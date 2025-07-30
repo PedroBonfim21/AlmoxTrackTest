@@ -87,7 +87,11 @@ export default function DashboardLayout({
   const handleSignOut = async () => {
     try {
       await signOut(auth);
-      toast({ title: "Você saiu com sucesso." });
+      toast({ 
+        title: "Você saiu com sucesso.",
+        description: "Redirecionando para a página de login.",
+        variant: "success",
+      });
       router.push("/login");
     } catch (error) {
       toast({
