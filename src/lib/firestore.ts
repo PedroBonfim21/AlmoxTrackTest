@@ -3,7 +3,6 @@ import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, query, where, r
 import { getStorage, ref, uploadString, getDownloadURL } from "firebase/storage";
 import { parseISO } from 'date-fns';
 
-
 // Product Type
 export type Product = {
     id: string;
@@ -149,27 +148,49 @@ export const uploadImage = async (imageObject: ImageObject) => {
   }
 
   try {
-    // 1. Desestrutura o objeto recebido do formulário
     const { base64, fileName, contentType } = imageObject;
     
     const storage = getStorage();
     const storageRef = ref(storage, `products/${Date.now()}_${fileName}`);
 
-    // 2. Define os metadados, que são cruciais para o Firebase reconhecer o arquivo como imagem
     const metadata = {
       contentType: contentType,
     };
     
-    // 3. Usa 'uploadString' com o formato 'data_url' e os metadados
     const snapshot = await uploadString(storageRef, base64, 'data_url', metadata);
     
-    // 4. Obtém e retorna a URL pública de download
     const downloadURL = await getDownloadURL(snapshot.ref);
     return downloadURL;
 
   } catch (error) {
     console.error("Erro ao fazer upload da imagem com Base64:", error);
     throw error;
+  }
+};
+
+export const generateNextItemCode = async (prefix: string): Promise<string> => {
+  const productsCollection = collection(db, 'products');
+  
+  const q = query(
+    productsCollection,
+    where('code', '>=', prefix),
+    where('code', '<=', prefix + '\uf8ff'),
+    orderBy('code', 'desc'),
+    limit(1)
+  );
+
+  const querySnapshot = await getDocs(q);
+
+  if (querySnapshot.empty) {
+    return `${prefix}-001`;
+  } else {
+    const lastCode = querySnapshot.docs[0].data().code;
+    const lastNumber = parseInt(lastCode.split('-').pop() || '0', 10);
+    
+    const nextNumber = lastNumber + 1;
+    const formattedNextNumber = nextNumber.toString().padStart(3, '0');
+
+    return `${prefix}-${formattedNextNumber}`;
   }
 };
 
@@ -181,10 +202,8 @@ export const finalizeEntry = async (entryData: EntryData): Promise<void> => {
             for (const item of entryData.items) {
                 const productRef = doc(db, "products", item.id);
                 
-                // Increment product quantity
                 transaction.update(productRef, { quantity: increment(item.quantity) });
 
-                // Create movement record
                 const movementData: Omit<Movement, 'id'> = {
                     productId: item.id,
                     date: entryData.date,
@@ -200,7 +219,7 @@ export const finalizeEntry = async (entryData: EntryData): Promise<void> => {
         });
     } catch (e) {
         console.error("Transaction failed: ", e);
-        throw e; // Re-throw the error to be caught by the calling function
+        throw e;
     }
 };
 
@@ -220,10 +239,8 @@ export const finalizeExit = async (exitData: ExitData): Promise<void> => {
                     throw new Error(`Estoque insuficiente para ${productDoc.data().name}.`);
                 }
 
-                // Decrement product quantity
                 transaction.update(productRef, { quantity: increment(-item.quantity) });
 
-                // Create movement record
                 const movementData: Omit<Movement, 'id'> = {
                     productId: item.id,
                     date: exitData.date,
@@ -252,10 +269,8 @@ export const finalizeReturn = async (returnData: ReturnData): Promise<void> => {
                     throw new Error(`Produto com ID ${item.id} não encontrado.`);
                 }
 
-                // Increment product quantity
                 transaction.update(productRef, { quantity: increment(item.quantity) });
 
-                // Create movement record
                 const movementData: Omit<Movement, 'id'> = {
                     productId: item.id,
                     date: returnData.date,
@@ -308,7 +323,6 @@ export const getMovements = async (filters: MovementFilters = {}): Promise<Movem
         }
     }
     
-    // Add default sorting to avoid another potential index error
     constraints.push(orderBy('date', 'desc'));
 
     const finalQuery = query(movementsCollection, ...constraints);

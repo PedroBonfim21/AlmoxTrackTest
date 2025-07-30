@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -44,7 +43,7 @@ import { EditItemSheet } from "./components/edit-item-sheet";
 import { MovementsSheet } from "./components/movements-sheet";
 import { useToast } from "@/hooks/use-toast";
 import type { Product } from "@/lib/firestore";
-import { getProducts, addProduct, updateProduct, deleteProduct, addMovement, uploadImage } from "@/lib/firestore";
+import { getProducts, addProduct, updateProduct, deleteProduct, addMovement, uploadImage, generateNextItemCode } from "@/lib/firestore";
 
 export default function InventoryPage() {
   const [products, setProducts] = React.useState<Product[]>([]);
@@ -92,6 +91,7 @@ const handleAddItem = React.useCallback(async (newItemData: {
   image?: { base64: string; fileName: string; contentType: string } | undefined;
   itemCode?: string;
   patrimony?: string;
+  reference?: string;
 }) => {
   setIsLoading(true);
   try {
@@ -100,19 +100,26 @@ const handleAddItem = React.useCallback(async (newItemData: {
     if (newItemData.image) {
       imageUrl = await uploadImage(newItemData.image);
     }
+    
+    // --- LÓGICA DE GERAÇÃO DE CÓDIGO SEQUENCIAL ---
+    const categoryPrefix = newItemData.category.substring(0, 3).toUpperCase();
+    const namePrefix = newItemData.name.substring(0, 3).toUpperCase();
+    const codePrefix = `${categoryPrefix}-${namePrefix}`;
 
-    const itemCode = newItemData.itemCode?.trim() || `new-${Date.now()}`;
+    const generatedCode = await generateNextItemCode(codePrefix);
+    // --- FIM DA LÓGICA ---
 
     const newProduct: Omit<Product, 'id'> = {
       name: newItemData.name,
       name_lowercase: newItemData.name.toLowerCase(),
-      code: itemCode,
+      code: generatedCode,
       patrimony: newItemData.materialType === 'permanente' ? (newItemData.patrimony ?? '') : 'N/A',
       type: newItemData.materialType,
       quantity: newItemData.initialQuantity || 0,
       unit: newItemData.unit,
       category: newItemData.category,
       image: imageUrl,
+      reference: newItemData.reference || ''
     };
 
     const newProductId = await addProduct(newProduct);
@@ -171,13 +178,13 @@ const handleUpdateItem = async (updatedItemData: any) => {
     });
     fetchProducts(searchTerm);
   } catch(error) {
-     toast({
+   toast({
         title: "Erro ao Atualizar Item",
         description: "Não foi possível atualizar o item. Tente novamente.",
         variant: "destructive"
-     });
+   });
   } finally {
-     setIsLoading(false);
+   setIsLoading(false);
   }
 };
   
