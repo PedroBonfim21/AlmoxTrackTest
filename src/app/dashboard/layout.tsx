@@ -1,8 +1,9 @@
-
 "use client";
 
 import Link from "next/link";
 import * as React from "react";
+import { useRouter, usePathname } from "next/navigation";
+import { getAuth, onAuthStateChanged, signOut, User } from "firebase/auth";
 import {
   CircleUser,
   LayoutDashboard,
@@ -13,7 +14,8 @@ import {
   Settings,
   ChevronsLeftRight,
   FileCog,
-  Warehouse
+  Warehouse,
+  Loader2,
 } from "lucide-react";
 import {
   SidebarProvider,
@@ -26,7 +28,7 @@ import {
   SidebarInset,
   SidebarTrigger,
   SidebarFooter,
-  SidebarSeparator
+  SidebarSeparator,
 } from "@/components/ui/sidebar";
 import {
   DropdownMenu,
@@ -39,22 +41,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { AdminSyncAuthDialog } from "./components/admin-sync-auth-dialog";
-import { usePathname } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import { syncToSheet } from "@/ai/flows/sync-sheet-flow";
-import { getAuth, onAuthStateChanged } from "firebase/auth";
-
-const auth = getAuth(); // Pegue sua instância de autenticação
-
-onAuthStateChanged(auth, (user) => {
-  if (user) {
-    // O usuário está logado.
-    console.log("VERIFICAÇÃO: Usuário está logado. UID:", user.uid);
-  } else {
-    // O usuário está deslogado.
-    console.log("VERIFICAÇÃO: Nenhum usuário logado.");
-  }
-});
+import { auth } from "@/lib/firebase";
 
 // Mock user role - 'Admin' or 'Operator'
 const currentUserRole = "Admin";
@@ -65,8 +54,27 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
   const { toast } = useToast();
   const [isAuthDialogOpen, setIsAuthDialogOpen] = React.useState(false);
+  
+  const [user, setUser] = React.useState<User | null>(null);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      if (currentUser) {
+        setUser(currentUser);
+        console.log("VERIFICAÇÃO: Usuário está logado. UID:", currentUser.uid);
+      } else {
+        setUser(null);
+        console.log("VERIFICAÇÃO: Nenhum usuário logado. Redirecionando...");
+        router.replace("/login");
+      }
+      setLoading(false);
+    });
+    return () => unsubscribe();
+  }, [router]);
 
   const navItems = [
     { href: "/dashboard", icon: LayoutDashboard, label: "Painel" },
@@ -75,6 +83,20 @@ export default function DashboardLayout({
     { href: "/dashboard/exit", icon: ArrowLeftFromLine, label: "Saída" },
     { href: "/dashboard/returns", icon: ChevronsLeftRight, label: "Devolução" },
   ];
+
+  const handleSignOut = async () => {
+    try {
+      await signOut(auth);
+      toast({ title: "Você saiu com sucesso." });
+      router.push("/login");
+    } catch (error) {
+      toast({
+        title: "Erro ao sair",
+        description: "Não foi possível fazer logout. Tente novamente.",
+        variant: "destructive",
+      });
+    }
+  };
 
   const handleSyncSuccess = async (credential: any) => {
     toast({
@@ -106,6 +128,20 @@ export default function DashboardLayout({
     }
   };
 
+  // Enquanto verifica a autenticação, mostra uma tela de carregamento
+  if (loading) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+  // Se não houver usuário, não renderiza nada (pois o redirecionamento já foi acionado)
+  if (!user) {
+    return null;
+  }
+
+  // Se chegou aqui, o usuário está logado. Renderiza o layout.
   return (
     <SidebarProvider>
       <Sidebar>
@@ -146,20 +182,21 @@ export default function DashboardLayout({
         </SidebarContent>
         <SidebarSeparator />
         <SidebarFooter>
-           <DropdownMenu>
+          <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="justify-start w-full h-auto px-2 py-2">
-                 <div className="flex justify-between w-full items-center">
-                    <div className="flex gap-2 items-center">
-                       <Avatar className="w-8 h-8">
-                         <AvatarFallback>A</AvatarFallback>
-                       </Avatar>
-                       <div className="flex flex-col items-start text-sm">
-                         <span className="font-medium text-sidebar-foreground">Admin</span>
-                         <span className="text-muted-foreground text-xs">admin@email.com</span>
-                       </div>
+                <div className="flex justify-between w-full items-center">
+                  <div className="flex gap-2 items-center">
+                    <Avatar className="w-8 h-8">
+                      {/* Mostra a primeira letra do email do usuário */}
+                      <AvatarFallback>{user.email ? user.email[0].toUpperCase() : 'U'}</AvatarFallback>
+                    </Avatar>
+                    <div className="flex flex-col items-start text-sm">
+                      <span className="font-medium text-sidebar-foreground">{user.email}</span>
+                      <span className="text-muted-foreground text-xs">{currentUserRole}</span>
                     </div>
-                 </div>
+                  </div>
+                </div>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
@@ -170,12 +207,10 @@ export default function DashboardLayout({
                 Configurações
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-               <DropdownMenuItem asChild>
-                 <Link href="/login">
-                   <LogOut className="mr-2 h-4 w-4" />
-                   Sair
-                 </Link>
-               </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleSignOut}>
+                <LogOut className="mr-2 h-4 w-4" />
+                Sair
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </SidebarFooter>
@@ -183,8 +218,7 @@ export default function DashboardLayout({
       <SidebarInset>
         <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-4 border-b bg-background/80 backdrop-blur-sm px-4 sm:px-6 md:hidden">
           <SidebarTrigger className="sm:hidden -ml-2" />
-          
-           <DropdownMenu>
+          <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
                 variant="outline"
@@ -195,19 +229,18 @@ export default function DashboardLayout({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuLabel>Admin</DropdownMenuLabel>
+              <DropdownMenuLabel>{currentUserRole}</DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem>
                 <Settings className="mr-2 h-4 w-4" />
                 Configurações
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-               <DropdownMenuItem asChild>
-                 <Link href="/login">
-                   <LogOut className="mr-2 h-4 w-4" />
-                   Sair
-                 </Link>
-               </DropdownMenuItem>
+              {/* Conecta a função de logout */}
+              <DropdownMenuItem onClick={handleSignOut}>
+                <LogOut className="mr-2 h-4 w-4" />
+                Sair
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </header>
@@ -221,5 +254,3 @@ export default function DashboardLayout({
     </SidebarProvider>
   );
 }
-
-    
