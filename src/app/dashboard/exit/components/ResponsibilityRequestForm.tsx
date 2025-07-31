@@ -215,6 +215,7 @@ export default function ResponsibilityRequestForm() {
                                     <SelectItem value="Transporte">Transporte</SelectItem>
                                     <SelectItem value="Administracao">Administração</SelectItem>
                                     <SelectItem value="Financeiro">Financeiro</SelectItem>
+                                    <SelectItem value="Limpeza">Limpeza</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>

@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -51,7 +50,7 @@ type RequestedItem = {
 
 export default function ConsumptionRequestForm() {
     const { toast } = useToast();
-    const [requestDate, setRequestDate] = React.useState<Date | undefined>(undefined);
+    const [requestDate, setRequestDate] = React.useState<Date | undefined>(new Date());
     const [requesterName, setRequesterName] = React.useState("");
     const [requesterId, setRequesterId] = React.useState("");
     const [department, setDepartment] = React.useState("");
@@ -61,10 +60,6 @@ export default function ConsumptionRequestForm() {
     const [selectedItem, setSelectedItem] = React.useState<Product | null>(null);
     const [isFinalizing, setIsFinalizing] = React.useState(false);
     
-    React.useEffect(() => {
-        setRequestDate(new Date());
-    }, []);
-
     const handleAddItem = () => {
         if (!selectedItem) {
             toast({ title: "Erro", description: "Por favor, busque e selecione um item.", variant: "destructive" });
@@ -177,19 +172,20 @@ export default function ConsumptionRequestForm() {
                         </div>
                     </div>
                     <div className="space-y-2">
-                        <label htmlFor="department" className="text-sm font-medium">Setor/Departamento</label>
-                        <Select onValueChange={setDepartment} value={department}>
-                            <SelectTrigger id="department">
-                                <SelectValue placeholder="Selecione um setor" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="Transito">Trânsito</SelectItem>
-                                <SelectItem value="Guarda">Guarda</SelectItem>
-                                <SelectItem value="Transporte">Transporte</SelectItem>
-                                <SelectItem value="Administracao">Administração</SelectItem>
-                                <SelectItem value="Financeiro">Financeiro</SelectItem>
-                            </SelectContent>
-                        </Select>
+                            <label htmlFor="department" className="text-sm font-medium">Setor/Departamento</label>
+                            <Select onValueChange={setDepartment} value={department}>
+                                <SelectTrigger id="department">
+                                    <SelectValue placeholder="Selecione um setor" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="Transito">Trânsito</SelectItem>
+                                    <SelectItem value="Guarda">Guarda</SelectItem>
+                                    <SelectItem value="Transporte">Transporte</SelectItem>
+                                    <SelectItem value="Administracao">Administração</SelectItem>
+                                    <SelectItem value="Financeiro">Financeiro</SelectItem>
+                                    <SelectItem value="Limpeza">Limpeza</SelectItem>
+                                </SelectContent>
+                            </Select>
                     </div>
                     <div className="space-y-2">
                         <label htmlFor="purpose" className="text-sm font-medium">Finalidade de Uso</label>
