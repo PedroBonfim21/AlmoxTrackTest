@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -27,14 +26,20 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { AddItemSheet } from "../inventory/components/add-item-sheet";
-import { AdminAuthDialog } from "./components/admin-auth-dialog";
 import { ItemSearch } from "../components/item-search";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import type { Product } from "@/lib/firestore";
-import { addProduct, finalizeEntry, uploadImage, addMovement } from "@/lib/firestore";
+import { addProduct, finalizeEntry, uploadImage, addMovement, generateNextItemCode } from "@/lib/firestore";
 
 type ReceivedItem = {
     id: string;
@@ -45,30 +50,27 @@ type ReceivedItem = {
 
 export default function EntryPage() {
     const { toast } = useToast();
-    const [entryDate, setEntryDate] = React.useState<Date | undefined>(undefined);
+    const [entryDate, setEntryDate] = React.useState<Date | undefined>(new Date());
     const [supplier, setSupplier] = React.useState("");
     const [invoice, setInvoice] = React.useState("");
-    
+    const [responsible, setResponsible] = React.useState("");
     const [quantity, setQuantity] = React.useState(1);
     const [receivedItems, setReceivedItems] = React.useState<ReceivedItem[]>([]);
     
     const [isAddItemSheetOpen, setIsAddItemSheetOpen] = React.useState(false);
-    const [isAuthDialogOpen, setIsAuthDialogOpen] = React.useState(false);
     const [isLoading, setIsLoading] = React.useState(false);
     const [isFinalizing, setIsFinalizing] = React.useState(false);
     const [selectedItemForAddition, setSelectedItemForAddition] = React.useState<Product | null>(null);
+    const [entryType, setEntryType] = React.useState<'Oficial' | 'Não Oficial'>('Oficial');
 
-    React.useEffect(() => {
-        setEntryDate(new Date());
-    }, []);
-    
     const handleSelectSearchItem = (item: Product) => {
         setSelectedItemForAddition(item);
     }
     
-    const handleSearchOrAddItem = async () => {
-        if (!selectedItemForAddition) {
-             toast({
+    const handleAddToList = () => {
+        const item = selectedItemForAddition;
+        if (!item) {
+            toast({
                 title: "Nenhum item selecionado",
                 description: "Por favor, busque e selecione um item da lista.",
                 variant: "destructive",
@@ -76,11 +78,6 @@ export default function EntryPage() {
             return;
         };
         
-        handleAddToList(selectedItemForAddition);
-        setSelectedItemForAddition(null); // Reset after adding
-    };
-    
-    const handleAddToList = (item: { id: string; name: string; unit: string; }) => {
         if (quantity <= 0) {
             toast({
                 title: "Quantidade inválida",
@@ -97,7 +94,9 @@ export default function EntryPage() {
             }
             return [...prev, { id: item.id, name: item.name, quantity, unit: item.unit }];
         });
+        
         setQuantity(1);
+        setSelectedItemForAddition(null);
     };
 
     const handleRemoveFromList = (itemId: string) => {
@@ -112,36 +111,33 @@ export default function EntryPage() {
                 imageUrl = await uploadImage(newItemData.image);
             }
 
+            const categoryPrefix = (newItemData.category === 'Outro' ? newItemData.otherCategory : newItemData.category).substring(0, 3).toUpperCase();
+            const namePrefix = newItemData.name.substring(0, 3).toUpperCase();
+            const codePrefix = `${categoryPrefix}-${namePrefix}`;
+            const generatedCode = await generateNextItemCode(codePrefix);
+            const finalCategory = newItemData.category === 'Outro' && newItemData.otherCategory ? newItemData.otherCategory : newItemData.category;
+
             const newProductData: Omit<Product, 'id'> = {
                 name: newItemData.name,
                 name_lowercase: newItemData.name.toLowerCase(),
-                code: newItemData.itemCode || `new-${Date.now()}`,
+                code: generatedCode,
                 unit: newItemData.unit,
                 patrimony: newItemData.materialType === 'permanente' ? newItemData.patrimony : 'N/A',
                 type: newItemData.materialType,
-                quantity: 0, // Initial quantity is 0, entry will update it
-                category: newItemData.category,
+                quantity: 0, // A quantidade inicial é 0, a entrada irá atualizá-la
+                category: finalCategory,
+                reference: newItemData.reference,
                 image: imageUrl,
             };
             
             const newProductId = await addProduct(newProductData);
             
-            if(newItemData.initialQuantity > 0) {
-                await addMovement({
-                    productId: newProductId,
-                    date: new Date().toISOString(),
-                    type: 'Entrada',
-                    quantity: newItemData.initialQuantity,
-                    responsible: 'Sistema' // Or a logged in user
-                });
-            }
-
             toast({
                 title: "Item Adicionado!",
                 description: `${newProductData.name} foi adicionado ao inventário.`,
             });
             
-            // If the item had an initial quantity, add it directly to the received list
+            // Adiciona o item recém-criado diretamente à lista de recebidos com sua quantidade inicial
             if (newItemData.initialQuantity > 0) {
                 setReceivedItems(prev => [...prev, {
                     id: newProductId,
@@ -158,196 +154,196 @@ export default function EntryPage() {
             });
         } finally {
             setIsLoading(false);
+            setIsAddItemSheetOpen(false); // Fecha o modal após adicionar
         }
     };
-
-    const handleAuthSuccess = () => {
-        setIsAuthDialogOpen(false);
-        setIsAddItemSheetOpen(true);
-    };
-    
-    const handleRegisterNewItemClick = () => {
-        setIsAuthDialogOpen(true);
-    }
 
     const handleFinalizeEntry = async () => {
-        if (receivedItems.length === 0) {
-            toast({
-                title: "Nenhum item adicionado",
-                description: "Adicione pelo menos um item para registrar a entrada.",
-                variant: "destructive"
-            });
-            return;
+    if (receivedItems.length === 0 || !supplier || !responsible) {
+        toast({ title: "Campos obrigatórios", description: "Preencha a data, fornecedor/secretaria, responsável e adicione pelo menos um item.", variant: "destructive" });
+        return;
+    }
+    if (entryType === 'Oficial' && !invoice) {
+        toast({ title: "Campo obrigatório", description: "Para entradas oficiais, a nota fiscal é obrigatória.", variant: "destructive" });
+        return;
+    }
+
+    setIsFinalizing(true);
+    try {
+        // Cria o objeto base com os campos que sempre existem
+        const entryPayload = {
+            items: receivedItems,
+            date: entryDate?.toISOString() || new Date().toISOString(),
+            supplier: supplier,
+            responsible: responsible,
+            entryType: entryType,
+            invoice: entryType === 'Oficial' ? invoice : undefined,
+        };
+
+        // Adiciona o campo 'invoice' apenas se a entrada for 'Oficial'
+        if (entryType === 'Oficial') {
+            entryPayload.invoice = invoice;
         }
-        if (!supplier || !invoice) {
-            toast({
-                title: "Campos obrigatórios",
-                description: "Preencha o fornecedor e a nota fiscal/processo.",
-                variant: "destructive"
-            });
-            return;
-        }
+
+        await finalizeEntry(entryPayload);
         
-        setIsFinalizing(true);
-        try {
-            await finalizeEntry({
-                items: receivedItems,
-                date: entryDate?.toISOString() || new Date().toISOString(),
-                supplier: supplier,
-                invoice: invoice,
-                responsible: 'sdpinho29' // Mock responsible user
-            });
-            
-            toast({
-                title: "Entrada Registrada!",
-                description: "A entrada de materiais foi registrada com sucesso.",
-            });
+        toast({ title: "Entrada Registrada!", description: "A entrada de materiais foi registrada com sucesso." });
+        
+        // Resetar o formulário
+        setEntryDate(new Date());
+        setSupplier("");
+        setInvoice("");
+        setResponsible("");
+        setReceivedItems([]);
+        
+    } catch (error: any) {
+        toast({
+            title: "Erro ao Finalizar Entrada",
+            description: error.message || "Não foi possível registrar a entrada. Tente novamente.",
+            variant: "destructive"
+        });
+    } finally {
+        setIsFinalizing(false);
+    }
+};
 
-            // Reset form
-            setEntryDate(new Date());
-            setSupplier("");
-            setInvoice("");
-            setReceivedItems([]);
-        } catch (error) {
-             toast({
-                title: "Erro ao Finalizar Entrada",
-                description: "Não foi possível registrar a entrada. Tente novamente.",
-                variant: "destructive"
-            });
-        } finally {
-            setIsFinalizing(false);
-        }
-    };
-
-  return (
+    return (
     <>
-      <div className="flex flex-col gap-6">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Registrar Entrada de Materiais</h1>
-            <p className="text-muted-foreground">
-              Preencha os dados da nota fiscal e adicione os itens recebidos.
-            </p>
-          </div>
-        </div>
+        <div className="flex flex-col gap-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+                <h1 className="text-3xl font-bold tracking-tight">Registrar Entrada de Materiais</h1>
+                <p className="text-muted-foreground">
+                    Preencha os dados e adicione os itens recebidos.
+                </p>
+            </div>
+            </div>
 
-        <Card>
-            <CardHeader>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                     <div className="space-y-2">
-                        <label htmlFor="entry-date" className="text-sm font-medium">Data da Entrada</label>
-                        <Popover>
-                            <PopoverTrigger asChild>
-                            <Button
-                                id="entry-date"
-                                variant={"outline"}
-                                className={cn(
-                                "w-full justify-start text-left font-normal",
-                                !entryDate && "text-muted-foreground"
-                                )}
-                            >
-                                <CalendarIcon className="mr-2 h-4 w-4" />
-                                {entryDate ? format(entryDate, "dd/MM/yyyy", { locale: ptBR }) : <span>Selecione uma data</span>}
-                            </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0">
-                                <Calendar
-                                    mode="single"
-                                    selected={entryDate}
-                                    onSelect={setEntryDate}
-                                    initialFocus
-                                    locale={ptBR}
-                                />
-                            </PopoverContent>
-                        </Popover>
-                     </div>
-                     <div className="space-y-2">
-                        <label htmlFor="supplier" className="text-sm font-medium">Fornecedor</label>
-                        <Input id="supplier" placeholder="Ex: Bic" value={supplier} onChange={e => setSupplier(e.target.value)} />
-                     </div>
-                     <div className="space-y-2">
-                        <label htmlFor="invoice" className="text-sm font-medium">Nota Fiscal / Processo</label>
-                        <Input id="invoice" placeholder="Ex: NF-e 456156451345" value={invoice} onChange={e => setInvoice(e.target.value)} />
-                     </div>
-                </div>
-            </CardHeader>
-            <CardContent>
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Itens Recebidos</CardTitle>
-                        <div className="flex flex-col md:flex-row items-end gap-2 pt-4">
-                            <ItemSearch 
-                                onSelectItem={handleSelectSearchItem} 
-                                searchId="entry-item-search"
-                                onRegisterNewItem={handleRegisterNewItemClick}
-                            />
-                            <div className="w-full md:w-24">
-                               <label htmlFor="quantity" className="text-sm font-medium">Qtd.</label>
-                               <Input id="quantity" type="number" value={quantity} onChange={e => setQuantity(Number(e.target.value))} min="1" />
-                            </div>
-                            <Button onClick={handleSearchOrAddItem} className="w-full md:w-auto">Adicionar</Button>
+            <Card>
+                <CardContent className="pt-6 space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div className="space-y-2">
+                            <label htmlFor="entry-date" className="text-sm font-medium">Data da Entrada</label>
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                <Button
+                                    id="entry-date"
+                                    variant={"outline"}
+                                    className={cn("w-full justify-start text-left font-normal", !entryDate && "text-muted-foreground")}
+                                >
+                                    <CalendarIcon className="mr-2 h-4 w-4" />
+                                    {entryDate ? format(entryDate, "dd/MM/yyyy", { locale: ptBR }) : <span>Selecione uma data</span>}
+                                </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0">
+                                <Calendar mode="single" selected={entryDate} onSelect={setEntryDate} initialFocus locale={ptBR} />
+                                </PopoverContent>
+                            </Popover>
                         </div>
-                        {selectedItemForAddition && (
-                            <div className="mt-2 p-2 bg-muted rounded-md text-sm">
-                                Item selecionado: <span className="font-medium">{selectedItemForAddition.name}</span>
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">Tipo de Entrada</label>
+                            <Select onValueChange={(value: 'Oficial' | 'Não Oficial') => setEntryType(value)} value={entryType}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Selecione o tipo" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="Oficial">Oficial (com Nota Fiscal)</SelectItem>
+                                    <SelectItem value="Não Oficial">Não Oficial (Transferência/Doação)</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div className="space-y-2">
+                            <label htmlFor="supplier" className="text-sm font-medium">
+                                {entryType === 'Oficial' ? 'Fornecedor' : 'Secretaria / Origem'}
+                            </label>
+                            <Input id="supplier" value={supplier} onChange={e => setSupplier(e.target.value)} />
+                        </div>
+
+                        {entryType === 'Oficial' && (
+                            <div className="space-y-2">
+                                <label htmlFor="invoice" className="text-sm font-medium">Nota Fiscal</label>
+                                <Input id="invoice" value={invoice} onChange={e => setInvoice(e.target.value)} />
                             </div>
                         )}
-                    </CardHeader>
-                    <CardContent>
-                         <div className="border rounded-md overflow-x-auto">
-                            <Table>
-                                <TableHeader>
-                                <TableRow>
-                                    <TableHead>Item</TableHead>
-                                    <TableHead className="w-[100px] text-right">Qtd</TableHead>
-                                    <TableHead className="w-[100px] text-center">Ação</TableHead>
-                                </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                 {receivedItems.length === 0 ? (
-                                    <TableRow>
-                                        <TableCell colSpan={3} className="text-center text-muted-foreground">
-                                            Nenhum item adicionado à entrada.
-                                        </TableCell>
-                                    </TableRow>
-                                 ) : (
-                                    receivedItems.map((item) => (
-                                        <TableRow key={item.id}>
-                                            <TableCell className="font-medium">{item.name}</TableCell>
-                                            <TableCell className="text-right">{`${item.quantity} ${item.unit}`}</TableCell>
-                                            <TableCell className="text-center">
-                                                <Button variant="ghost" size="icon" className="text-red-600 hover:bg-red-100 h-auto p-0" onClick={() => handleRemoveFromList(item.id)}>
-                                                  <Trash2 className="h-4 w-4" />
-                                                </Button>
-                                            </TableCell>
+
+                        <div className="space-y-2">
+                            <label htmlFor="responsible" className="text-sm font-medium">Responsável pelo Recebimento</label>
+                            <Input id="responsible" value={responsible} onChange={e => setResponsible(e.target.value)} />
+                        </div>
+                    </div>
+                
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Itens Recebidos</CardTitle>
+                            <div className="flex flex-col md:flex-row items-end gap-2 pt-4">
+                                <ItemSearch 
+                                    onSelectItem={handleSelectSearchItem} 
+                                    searchId="entry-item-search"
+                                    onRegisterNewItem={() => setIsAddItemSheetOpen(true)}
+                                />
+                                <div className="w-full md:w-24">
+                                    <label htmlFor="quantity" className="text-sm font-medium">Qtd.</label>
+                                    <Input id="quantity" type="number" value={quantity} onChange={e => setQuantity(Number(e.target.value))} min="1" />
+                                </div>
+                                <Button onClick={handleAddToList} className="w-full md:w-auto">Adicionar</Button>
+                            </div>
+                            {selectedItemForAddition && (
+                                <div className="mt-2 p-2 bg-muted rounded-md text-sm">
+                                    Item selecionado: <span className="font-medium">{selectedItemForAddition.name}</span>
+                                </div>
+                            )}
+                        </CardHeader>
+                        <CardContent>
+                             <div className="border rounded-md overflow-x-auto">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Item</TableHead>
+                                            <TableHead className="w-[100px] text-right">Qtd</TableHead>
+                                            <TableHead className="w-[100px] text-center">Ação</TableHead>
                                         </TableRow>
-                                    ))
-                                 )}
-                                </TableBody>
-                            </Table>
-                         </div>
-                    </CardContent>
-                </Card>
-            </CardContent>
-        </Card>
-         <div className="flex justify-end">
-            <Button variant="accent" size="lg" onClick={handleFinalizeEntry} disabled={isFinalizing}>
-                {isFinalizing ? "Finalizando..." : "Finalizar Entrada"}
-            </Button>
+                                    </TableHeader>
+                                    <TableBody>
+                                       {receivedItems.length === 0 ? (
+                                            <TableRow>
+                                                <TableCell colSpan={3} className="text-center text-muted-foreground">
+                                                    Nenhum item adicionado à entrada.
+                                                </TableCell>
+                                            </TableRow>
+                                       ) : (
+                                            receivedItems.map((item) => (
+                                                <TableRow key={item.id}>
+                                                    <TableCell className="font-medium">{item.name}</TableCell>
+                                                    <TableCell className="text-right">{`${item.quantity} ${item.unit}`}</TableCell>
+                                                    <TableCell className="text-center">
+                                                        <Button variant="ghost" size="icon" className="text-red-600 hover:bg-red-100 h-auto p-0" onClick={() => handleRemoveFromList(item.id)}>
+                                                            <Trash2 className="h-4 w-4" />
+                                                        </Button>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))
+                                       )}
+                                    </TableBody>
+                                </Table>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </CardContent>
+            </Card>
+            <div className="flex justify-end">
+                <Button size="lg" onClick={handleFinalizeEntry} disabled={isFinalizing || receivedItems.length === 0}>
+                    {isFinalizing ? "Finalizando..." : "Finalizar Entrada"}
+                </Button>
+            </div>
         </div>
-      </div>
-      <AddItemSheet 
-        isOpen={isAddItemSheetOpen}
-        onOpenChange={setIsAddItemSheetOpen}
-        onItemAdded={handleItemAdded}
-      />
-      <AdminAuthDialog
-        isOpen={isAuthDialogOpen}
-        onOpenChange={setIsAuthDialogOpen}
-        onAuthSuccess={handleAuthSuccess}
-      />
+        <AddItemSheet 
+            isOpen={isAddItemSheetOpen}
+            onOpenChange={setIsAddItemSheetOpen}
+            onItemAdded={handleItemAdded}
+        />
     </>
   );
 }
-
-    
