@@ -177,8 +177,9 @@ export default function ReturnsPage() {
                             </div>
                             <div className="space-y-2">
                                 <label htmlFor="returning-department" className="text-sm font-medium">Setor Devolvente</label>
-                                <Select onValueChange={setDepartment} value={department}>
-                                    <SelectTrigger id="department">
+                                {/* CÓDIGO CORRIGIDO AQUI */}
+                                <Select value={returningDepartment} onValueChange={setReturningDepartment}>
+                                    <SelectTrigger id="returning-department">
                                         <SelectValue placeholder="Selecione um setor" />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -197,10 +198,10 @@ export default function ReturnsPage() {
                                         <SelectValue placeholder="Selecione o motivo" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="unused">Material não utilizado</SelectItem>
-                                        <SelectItem value="excess">Material em excesso</SelectItem>
-                                        <SelectItem value="defective">Material com defeito</SelectItem>
-                                        <SelectItem value="other">Outro</SelectItem>
+                                        <SelectItem value="Material não utilizado">Material não utilizado</SelectItem>
+                                        <SelectItem value="Material em excesso">Material em excesso</SelectItem>
+                                        <SelectItem value="Material com defeito">Material com defeito</SelectItem>
+                                        <SelectItem value="Outro">Outro</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
