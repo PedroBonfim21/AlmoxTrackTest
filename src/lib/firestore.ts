@@ -24,6 +24,7 @@ export type Movement = {
     productId: string;
     date: string; // ISO 8601 format
     type: 'Entrada' | 'Saída' | 'Devolução';
+    entryType?: 'Oficial' | 'Não Oficial'; // <-- ADICIONE ESTA LINHA
     quantity: number;
     responsible: string;
     department?: string;
@@ -35,8 +36,9 @@ type EntryData = {
     items: { id: string; quantity: number }[];
     date: string;
     supplier: string;
-    invoice: string;
+    invoice?: string;
     responsible: string;
+    entryType: 'Oficial' | 'Não Oficial';
 }
 
 type ExitData = {
@@ -204,6 +206,7 @@ export const finalizeEntry = async (entryData: EntryData): Promise<void> => {
                 
                 transaction.update(productRef, { quantity: increment(item.quantity) });
 
+                // 1. Cria o objeto base com os campos que sempre existem
                 const movementData: Omit<Movement, 'id'> = {
                     productId: item.id,
                     date: entryData.date,
@@ -211,8 +214,14 @@ export const finalizeEntry = async (entryData: EntryData): Promise<void> => {
                     quantity: item.quantity,
                     responsible: entryData.responsible,
                     supplier: entryData.supplier,
-                    invoice: entryData.invoice,
+                    entryType: entryData.entryType,
                 };
+
+                // 2. Adiciona o campo 'invoice' apenas se ele foi fornecido
+                if (entryData.invoice) {
+                    movementData.invoice = entryData.invoice;
+                }
+
                 const movementRef = doc(collection(db, "movements"));
                 transaction.set(movementRef, movementData);
             }
