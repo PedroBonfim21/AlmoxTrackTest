@@ -3,7 +3,8 @@
 import Link from "next/link";
 import * as React from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { getAuth, onAuthStateChanged, signOut, User } from "firebase/auth";
+import { signOut, User } from "firebase/auth";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext"; // Importa do novo ficheiro
 import {
   CircleUser,
   LayoutDashboard,
@@ -45,36 +46,16 @@ import { useToast } from "@/hooks/use-toast";
 import { syncToSheet } from "@/ai/flows/sync-sheet-flow";
 import { auth } from "@/lib/firebase";
 import Image from "next/image";
-// Mock user role - 'Admin' or 'Operator'
-const currentUserRole = "Admin";
 
-export default function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+const currentUserRole = "Admin"; // Mock user role
+
+// Componente interno que contém a lógica e o JSX do layout
+function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { toast } = useToast();
+  const { user, loading } = useAuth(); // <-- AGORA USA O HOOK DO CONTEXTO
   const [isAuthDialogOpen, setIsAuthDialogOpen] = React.useState(false);
-  
-  const [user, setUser] = React.useState<User | null>(null);
-  const [loading, setLoading] = React.useState(true);
-
-  React.useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      if (currentUser) {
-        setUser(currentUser);
-        console.log("VERIFICAÇÃO: Usuário está logado. UID:", currentUser.uid);
-      } else {
-        setUser(null);
-        console.log("VERIFICAÇÃO: Nenhum usuário logado. Redirecionando...");
-        router.replace("/login");
-      }
-      setLoading(false);
-    });
-    return () => unsubscribe();
-  }, [router]);
 
   const navItems = [
     { href: "/dashboard", icon: LayoutDashboard, label: "Painel" },
@@ -87,11 +68,7 @@ export default function DashboardLayout({
   const handleSignOut = async () => {
     try {
       await signOut(auth);
-      toast({ 
-        title: "Você saiu com sucesso.",
-        description: "Redirecionando para a página de login.",
-        variant: "success",
-      });
+      toast({ title: "Você saiu com sucesso." });
       router.push("/login");
     } catch (error) {
       toast({
@@ -132,7 +109,6 @@ export default function DashboardLayout({
     }
   };
 
-  // Enquanto verifica a autenticação, mostra uma tela de carregamento
   if (loading) {
     return (
       <div className="flex h-screen w-full items-center justify-center">
@@ -140,130 +116,120 @@ export default function DashboardLayout({
       </div>
     );
   }
-  // Se não houver usuário, não renderiza nada (pois o redirecionamento já foi acionado)
+
   if (!user) {
+    router.replace("/login");
     return null;
   }
 
-  // Se chegou aqui, o usuário está logado. Renderiza o layout.
   return (
     <SidebarProvider>
       <Sidebar>
-        <SidebarHeader
-        className="mb-3 ml-5"
-        >
-          <Image
-            src="/LOGO.png"
-            width={500}
-            height={40}
-            alt="SESTRANS-Goiana"
-          />
-          <div className="flex items-center gap-2 p-2">
-            <Warehouse className="w-8 h-8 text-primary" />
-            <span className="text-xl font-semibold mt-1">AlmoxTrack</span>
-          </div>
+        <SidebarHeader className="mb-3 ml-5">
+            <Image 
+                src="/LOGO.png" 
+                width={500} 
+                height={40} 
+                alt="SESTRANS-Goiana" 
+            />
+            <div className="flex items-center gap-2 p-2">
+                <Warehouse className="w-8 h-8 text-primary" />
+                <span className="text-xl font-semibold mt-1">AlmoxTrack</span>
+            </div>
         </SidebarHeader>
-        <hr 
-          className="mx-6"
-        />
-        <SidebarContent
-          className="mt-4"
-        >
-          <SidebarMenu>
+        <hr className="mx-6" />
+        <SidebarContent className="mt-4">
+            <SidebarMenu>
             {navItems.map((item) => (
-              <SidebarMenuItem key={item.label}>
+                <SidebarMenuItem key={item.label}>
                 <SidebarMenuButton
-                  asChild
-                  isActive={pathname === item.href}
-                  tooltip={item.label}
-                  className="h-12 justify-start"
+                    asChild
+                    isActive={pathname === item.href}
+                    tooltip={item.label}
+                    className="h-12 justify-start"
                 >
-                  <Link href={item.href}>
+                    <Link href={item.href}>
                     <item.icon />
                     <span>{item.label}</span>
-                  </Link>
+                    </Link>
                 </SidebarMenuButton>
-              </SidebarMenuItem>
+                </SidebarMenuItem>
             ))}
             {currentUserRole === 'Admin' && (
-              <SidebarMenuItem>
+                <SidebarMenuItem>
                 <SidebarMenuButton
-                  onClick={() => setIsAuthDialogOpen(true)}
-                  tooltip={"Sincronizar Planilha"}
-                  className="h-12 justify-start"
+                    onClick={() => setIsAuthDialogOpen(true)}
+                    tooltip={"Sincronizar Planilha"}
+                    className="h-12 justify-start"
                 >
-                  <FileCog />
-                  <span>{"Sincronizar Planilha"}</span>
+                    <FileCog />
+                    <span>{"Sincronizar Planilha"}</span>
                 </SidebarMenuButton>
-              </SidebarMenuItem>
+                </SidebarMenuItem>
             )}
-          </SidebarMenu>
+            </SidebarMenu>
         </SidebarContent>
         <SidebarSeparator />
-        <SidebarFooter
-        className="mb-5 mt-1"
-        >
-          <DropdownMenu>
+        <SidebarFooter className="mb-5 mt-1">
+            <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="justify-start w-full h-auto px-2 py-2">
+                <Button variant="ghost" className="justify-start w-full h-auto px-2 py-2">
                 <div className="flex justify-between w-full items-center">
-                  <div className="flex gap-2 items-center">
+                    <div className="flex gap-2 items-center">
                     <Avatar className="w-8 h-8">
-                      {/* Mostra a primeira letra do email do usuário */}
-                      <AvatarFallback>{user.email ? user.email[0].toUpperCase() : 'U'}</AvatarFallback>
+                        <AvatarFallback>{user.email ? user.email[0].toUpperCase() : 'U'}</AvatarFallback>
                     </Avatar>
                     <div className="flex flex-col items-start text-sm">
-                      <span className="font-medium text-sidebar-foreground">{user.email}</span>
-                      <span className="text-muted-foreground text-xs">{currentUserRole}</span>
+                        <span className="font-medium text-sidebar-foreground">{user.email}</span>
+                        <span className="text-muted-foreground text-xs">{currentUserRole}</span>
                     </div>
-                  </div>
+                    </div>
                 </div>
-              </Button>
+                </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuLabel>Minha Conta</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem>
+                <DropdownMenuLabel>Minha Conta</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem>
                 <Settings className="mr-2 h-4 w-4" />
                 Configurações
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={handleSignOut}>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleSignOut}>
                 <LogOut className="mr-2 h-4 w-4" />
                 Sair
-              </DropdownMenuItem>
+                </DropdownMenuItem>
             </DropdownMenuContent>
-          </DropdownMenu>
+            </DropdownMenu>
         </SidebarFooter>
       </Sidebar>
       <SidebarInset>
         <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-4 border-b bg-background/80 backdrop-blur-sm px-4 sm:px-6 md:hidden">
-          <SidebarTrigger className="sm:hidden -ml-2" />
-          <DropdownMenu>
+            <SidebarTrigger className="sm:hidden -ml-2" />
+            <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button
+                <Button
                 variant="outline"
                 size="icon"
                 className="overflow-hidden rounded-full ml-auto"
-              >
+                >
                 <CircleUser className="h-5 w-5" />
-              </Button>
+                </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuLabel>{currentUserRole}</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem>
+                <DropdownMenuLabel>{currentUserRole}</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem>
                 <Settings className="mr-2 h-4 w-4" />
                 Configurações
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              {/* Conecta a função de logout */}
-              <DropdownMenuItem onClick={handleSignOut}>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleSignOut}>
                 <LogOut className="mr-2 h-4 w-4" />
                 Sair
-              </DropdownMenuItem>
+                </DropdownMenuItem>
             </DropdownMenuContent>
-          </DropdownMenu>
+            </DropdownMenu>
         </header>
         <main className="flex-1 p-4 sm:px-6 sm:py-6">{children}</main>
       </SidebarInset>
@@ -273,5 +239,14 @@ export default function DashboardLayout({
         onAuthSuccess={handleSyncSuccess}
       />
     </SidebarProvider>
+  );
+}
+
+// O componente principal exportado agora só envolve tudo com o Provedor
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <AuthProvider>
+      <DashboardLayoutContent>{children}</DashboardLayoutContent>
+    </AuthProvider>
   );
 }

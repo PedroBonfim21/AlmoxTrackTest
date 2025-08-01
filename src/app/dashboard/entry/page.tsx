@@ -40,6 +40,7 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import type { Product } from "@/lib/firestore";
 import { addProduct, finalizeEntry, uploadImage, addMovement, generateNextItemCode } from "@/lib/firestore";
+import { useAuth } from "@/contexts/AuthContext"; // Importa o hook de autenticação
 
 type ReceivedItem = {
     id: string;
@@ -62,6 +63,7 @@ export default function EntryPage() {
     const [isFinalizing, setIsFinalizing] = React.useState(false);
     const [selectedItemForAddition, setSelectedItemForAddition] = React.useState<Product | null>(null);
     const [entryType, setEntryType] = React.useState<'Oficial' | 'Não Oficial'>('Oficial');
+    const { user } = useAuth(); // Hook para obter o usuário autenticado
 
     const handleSelectSearchItem = (item: Product) => {
         setSelectedItemForAddition(item);
@@ -175,7 +177,7 @@ export default function EntryPage() {
             items: receivedItems,
             date: entryDate?.toISOString() || new Date().toISOString(),
             supplier: supplier,
-            responsible: responsible,
+            responsible: `Responsável:${responsible} Operador:${user?.email || "Desconhecido"}`,
             entryType: entryType,
             invoice: entryType === 'Oficial' ? invoice : undefined,
         };
