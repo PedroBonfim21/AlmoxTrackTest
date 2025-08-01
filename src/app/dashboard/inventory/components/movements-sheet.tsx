@@ -102,7 +102,23 @@ export function MovementsSheet({ isOpen, onOpenChange, item }: MovementsSheetPro
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right font-medium">{movement.quantity}</TableCell>
-                        <TableCell>{movement.responsible}</TableCell>
+                        <TableCell>
+                            {movement.responsible.includes("Operador:") ? (
+                              <div className="flex flex-col">
+                                {/* Operador (email) em destaque */}
+                                <span className="font-medium">
+                                  {movement.responsible.split(" Operador:")[1]}
+                                </span>
+                                {/* Responsável (nome) secundário */}
+                                <span className="text-muted-foreground text-xs">
+                                  {movement.responsible.split(" Operador:")[0]}
+                                </span>
+                              </div>
+                            ) : (
+                              // Mantém a exibição padrão para outros formatos
+                              <span>{movement.responsible}</span>
+                            )}
+                        </TableCell>
                       </TableRow>
                     ))
                   ) : (

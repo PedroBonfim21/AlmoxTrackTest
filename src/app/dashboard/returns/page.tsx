@@ -40,7 +40,7 @@ import { cn } from "@/lib/utils";
 import type { Product } from "@/lib/firestore";
 import { finalizeReturn } from "@/lib/firestore";
 import { ItemSearch } from "../components/item-search";
-
+import { useAuth } from "@/contexts/AuthContext";
 
 type ReturnedItem = {
     id: string;
@@ -59,6 +59,7 @@ export default function ReturnsPage() {
     const [selectedItem, setSelectedItem] = React.useState<Product | null>(null);
     const [isFinalizing, setIsFinalizing] = React.useState(false);
     const [department, setDepartment] = React.useState("");
+    const { user } = useAuth();
 
     React.useEffect(() => {
         setReturnDate(new Date());
@@ -125,7 +126,7 @@ export default function ReturnsPage() {
                 date: returnDate?.toISOString() || new Date().toISOString(),
                 department: returningDepartment,
                 reason: returnReason,
-                responsible: 'sdpinho29' // Mock responsible
+                responsible: user?.email || "Desconhecido",
             });
 
             toast({

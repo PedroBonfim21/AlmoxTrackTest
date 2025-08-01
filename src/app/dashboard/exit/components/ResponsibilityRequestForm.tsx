@@ -52,6 +52,7 @@ import { cn } from "@/lib/utils";
 import type { Product } from "@/lib/firestore";
 import { finalizeExit } from "@/lib/firestore";
 import { ItemSearch } from "../../components/item-search";
+import { useAuth } from "@/contexts/AuthContext";
 
 type RequestedItem = {
     id: string;
@@ -75,6 +76,7 @@ export default function ResponsibilityRequestForm() {
     const [isTermAccepted, setIsTermAccepted] = React.useState(false);
     const [isFinalizing, setIsFinalizing] = React.useState(false);
     const [department, setDepartment] = React.useState("");
+    const { user } = useAuth();
 
     React.useEffect(() => {
         setResponsibilityDate(new Date());
@@ -141,7 +143,7 @@ export default function ResponsibilityRequestForm() {
                 requester: `${responsibleName} (${responsibleId})`,
                 department: responsibilityDepartment,
                 purpose: projectDescription,
-                responsible: 'sdpinho29' // Mock responsible
+                responsible: user?.email || "Desconhecido",
             });
 
             toast({ title: "Termo Gerado e Saída Registrada!", description: "A saída de material permanente foi registrada com sucesso." });
@@ -199,7 +201,7 @@ export default function ResponsibilityRequestForm() {
                                 <Input id="responsible-name" value={responsibleName} onChange={e => setResponsibleName(e.target.value)} />
                             </div>
                             <div className="space-y-2">
-                                <label htmlFor="responsible-id" className="text-sm font-medium">Matrícula</label>
+                                <label htmlFor="responsible-id" className="text-sm font-medium">Matrícula do Responsável</label>
                                 <Input id="responsible-id" value={responsibleId} onChange={e => setResponsibleId(e.target.value)} />
                             </div>
                         </div>

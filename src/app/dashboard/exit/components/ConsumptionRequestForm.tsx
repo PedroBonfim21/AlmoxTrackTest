@@ -33,6 +33,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useAuth } from "@/contexts/AuthContext";
 import { Calendar } from "@/components/ui/calendar";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
@@ -59,6 +60,8 @@ export default function ConsumptionRequestForm() {
     const [requestedItems, setRequestedItems] = React.useState<RequestedItem[]>([]);
     const [selectedItem, setSelectedItem] = React.useState<Product | null>(null);
     const [isFinalizing, setIsFinalizing] = React.useState(false);
+
+    const { user } = useAuth();
     
     const handleAddItem = () => {
         if (!selectedItem) {
@@ -116,7 +119,7 @@ export default function ConsumptionRequestForm() {
                 requester: `${requesterName} (${requesterId})`,
                 department: department,
                 purpose: purpose,
-                responsible: 'sdpinho29' // Mock responsible
+                responsible: user?.email || "Desconhecido",
             });
             
             toast({ title: "Saída Registrada!", description: "A saída de materiais de consumo foi registrada com sucesso." });
