@@ -24,14 +24,16 @@ export type Movement = {
     productId: string;
     date: string; // ISO 8601 format
     type: 'Entrada' | 'Saída' | 'Devolução';
-    entryType?: 'Oficial' | 'Não Oficial'; // <-- ADICIONE ESTA LINHA
+    entryType?: 'Oficial' | 'Não Oficial';
     quantity: number;
     responsible: string;
     department?: string;
     supplier?: string;
     invoice?: string;
+    productType?: 'consumo' | 'permanente'; // Campo adicionado para desnormalização
 };
 
+// Data Types for transactions
 type EntryData = {
     items: { id: string; quantity: number }[];
     date: string;
@@ -65,7 +67,6 @@ type MovementFilters = {
   movementType?: string;
   materialType?: string;
   department?: string;
-  products?: Product[]; // Needed for materialType filtering
 };
 
 type ProductFilters = {
@@ -73,14 +74,12 @@ type ProductFilters = {
     materialType?: 'consumo' | 'permanente';
 }
 
-
 // Product Functions
 const productsCollection = collection(db, 'products');
 const movementsCollection = collection(db, 'movements');
 
 export const getProducts = async (filters: ProductFilters = {}): Promise<Product[]> => {
     const { searchTerm, materialType } = filters;
-    
     const constraints: QueryConstraint[] = [];
 
     if (materialType) {
@@ -89,38 +88,33 @@ export const getProducts = async (filters: ProductFilters = {}): Promise<Product
 
     if (searchTerm && searchTerm.length > 0) {
         const lowercasedTerm = searchTerm.toLowerCase();
-        // Firestore queries for "starts with"
-        constraints.push(where('name_lowercase', '>=', lowercasedTerm));
-        constraints.push(where('name_lowercase', '<=', lowercasedTerm + '\uf8ff'));
-        constraints.push(orderBy('name_lowercase'));
-    } else {
-        constraints.push(orderBy('name')); // Default sort
-    }
-
-    if (!searchTerm) { // Limit results only when not searching
-        constraints.push(limit(50));
-    }
-
-    const finalQuery = query(productsCollection, ...constraints);
-    const snapshot = await getDocs(finalQuery);
-
-    let products: Product[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
-
-    // If name search returns nothing and it's a search term, try searching by code
-    if (searchTerm && products.length === 0) {
-        const codeConstraints: QueryConstraint[] = [
+        const nameQuery = query(productsCollection, ...constraints, 
+            orderBy('name_lowercase'), 
+            where('name_lowercase', '>=', lowercasedTerm), 
+            where('name_lowercase', '<=', lowercasedTerm + '\uf8ff')
+        );
+        const codeQuery = query(productsCollection, ...constraints, 
             where('code', '==', searchTerm)
-        ];
-        if (materialType) {
-            codeConstraints.push(where('type', '==', materialType));
-        }
-        const codeQuery = query(productsCollection, ...codeConstraints);
-        const codeSnapshot = await getDocs(codeQuery);
-        products = codeSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
-    }
+        );
 
-    return products;
+        const [nameSnapshot, codeSnapshot] = await Promise.all([
+            getDocs(nameQuery),
+            getDocs(codeQuery)
+        ]);
+
+        const productsMap = new Map<string, Product>();
+        nameSnapshot.docs.forEach(doc => productsMap.set(doc.id, { id: doc.id, ...doc.data() } as Product));
+        codeSnapshot.docs.forEach(doc => productsMap.set(doc.id, { id: doc.id, ...doc.data() } as Product));
+
+        return Array.from(productsMap.values());
+    } else {
+        constraints.push(orderBy('name_lowercase'));
+        const finalQuery = query(productsCollection, ...constraints);
+        const snapshot = await getDocs(finalQuery);
+        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
+    }
 };
+
 
 export const addProduct = async (productData: Omit<Product, 'id'>): Promise<string> => {
     const docRef = await addDoc(productsCollection, productData);
@@ -144,26 +138,17 @@ type ImageObject = {
 };
 
 export const uploadImage = async (imageObject: ImageObject) => {
-  // Se o objeto de imagem não existir, retorna uma URL padrão ou nula
   if (!imageObject || !imageObject.base64) {
     return "https://placehold.co/40x40.png";
   }
-
   try {
     const { base64, fileName, contentType } = imageObject;
-    
     const storage = getStorage();
     const storageRef = ref(storage, `products/${Date.now()}_${fileName}`);
-
-    const metadata = {
-      contentType: contentType,
-    };
-    
+    const metadata = { contentType: contentType };
     const snapshot = await uploadString(storageRef, base64, 'data_url', metadata);
-    
     const downloadURL = await getDownloadURL(snapshot.ref);
     return downloadURL;
-
   } catch (error) {
     console.error("Erro ao fazer upload da imagem com Base64:", error);
     throw error;
@@ -171,8 +156,6 @@ export const uploadImage = async (imageObject: ImageObject) => {
 };
 
 export const generateNextItemCode = async (prefix: string): Promise<string> => {
-  const productsCollection = collection(db, 'products');
-  
   const q = query(
     productsCollection,
     where('code', '>=', prefix),
@@ -180,22 +163,17 @@ export const generateNextItemCode = async (prefix: string): Promise<string> => {
     orderBy('code', 'desc'),
     limit(1)
   );
-
   const querySnapshot = await getDocs(q);
-
   if (querySnapshot.empty) {
     return `${prefix}-001`;
   } else {
     const lastCode = querySnapshot.docs[0].data().code;
     const lastNumber = parseInt(lastCode.split('-').pop() || '0', 10);
-    
     const nextNumber = lastNumber + 1;
     const formattedNextNumber = nextNumber.toString().padStart(3, '0');
-
     return `${prefix}-${formattedNextNumber}`;
   }
 };
-
 
 // Transactional Functions for Movements
 export const finalizeEntry = async (entryData: EntryData): Promise<void> => {
@@ -203,10 +181,14 @@ export const finalizeEntry = async (entryData: EntryData): Promise<void> => {
         await runTransaction(db, async (transaction) => {
             for (const item of entryData.items) {
                 const productRef = doc(db, "products", item.id);
+                const productDoc = await transaction.get(productRef);
+
+                if (!productDoc.exists()) {
+                    throw new Error(`Produto com ID ${item.id} não encontrado.`);
+                }
                 
                 transaction.update(productRef, { quantity: increment(item.quantity) });
 
-                // 1. Cria o objeto base com os campos que sempre existem
                 const movementData: Omit<Movement, 'id'> = {
                     productId: item.id,
                     date: entryData.date,
@@ -215,9 +197,9 @@ export const finalizeEntry = async (entryData: EntryData): Promise<void> => {
                     responsible: entryData.responsible,
                     supplier: entryData.supplier,
                     entryType: entryData.entryType,
+                    productType: productDoc.data().type, // Salva o tipo do produto
                 };
 
-                // 2. Adiciona o campo 'invoice' apenas se ele foi fornecido
                 if (entryData.invoice) {
                     movementData.invoice = entryData.invoice;
                 }
@@ -257,6 +239,7 @@ export const finalizeExit = async (exitData: ExitData): Promise<void> => {
                     quantity: item.quantity,
                     responsible: exitData.responsible,
                     department: exitData.department,
+                    productType: productDoc.data().type, // Salva o tipo do produto
                 };
                 const movementRef = doc(collection(db, "movements"));
                 transaction.set(movementRef, movementData);
@@ -287,6 +270,7 @@ export const finalizeReturn = async (returnData: ReturnData): Promise<void> => {
                     quantity: item.quantity,
                     responsible: returnData.responsible,
                     department: returnData.department,
+                    productType: productDoc.data().type, // Salva o tipo do produto
                 };
                 const movementRef = doc(collection(db, "movements"));
                 transaction.set(movementRef, movementData);
@@ -298,38 +282,23 @@ export const finalizeReturn = async (returnData: ReturnData): Promise<void> => {
     }
 };
 
-
 // Movement Functions
 export const getMovements = async (filters: MovementFilters = {}): Promise<Movement[]> => {
-    const { startDate, endDate, movementType, materialType, department, products } = filters;
-
+    const { startDate, endDate, movementType, materialType, department } = filters;
+    const movementsCollection = collection(db, 'movements');
     let constraints: QueryConstraint[] = [];
 
-    if (startDate) {
-        constraints.push(where('date', '>=', startDate));
-    }
+    if (startDate) { constraints.push(where('date', '>=', startDate)); }
     if (endDate) {
         const toDate = new Date(parseISO(endDate));
         toDate.setHours(23, 59, 59, 999);
         constraints.push(where('date', '<=', toDate.toISOString()));
     }
-    if (movementType) {
-        constraints.push(where('type', '==', movementType));
-    }
-    if (department) {
-        constraints.push(where('department', '==', department));
-    }
+    if (movementType && movementType !== 'all') { constraints.push(where('type', '==', movementType)); }
+    if (department && department !== 'all') { constraints.push(where('department', '==', department)); }
     
-    if (materialType && products) {
-        const productIds = products
-            .filter((p) => p.type === materialType)
-            .map((p) => p.id);
-        
-        if (productIds.length > 0) {
-            constraints.push(where('productId', 'in', productIds));
-        } else {
-            return [];
-        }
+    if (materialType && materialType !== 'all') {
+        constraints.push(where('productType', '==', materialType));
     }
     
     constraints.push(orderBy('date', 'desc'));
@@ -341,10 +310,9 @@ export const getMovements = async (filters: MovementFilters = {}): Promise<Movem
 };
 
 export const getMovementsForItem = async (productId: string): Promise<Movement[]> => {
-    const q = query(movementsCollection, where('productId', '==', productId));
+    const q = query(movementsCollection, where('productId', '==', productId), orderBy('date', 'desc'));
     const snapshot = await getDocs(q);
-    const movements = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Movement));
-    return movements;
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Movement));
 }
 
 export const addMovement = async (movementData: Omit<Movement, 'id'>): Promise<string> => {
