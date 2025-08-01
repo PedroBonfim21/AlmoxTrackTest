@@ -51,6 +51,9 @@ import type { Product, Movement } from "@/lib/firestore";
 import { getProducts, getMovements } from "@/lib/firestore";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import { startOfMonth, endOfMonth, subMonths } from "date-fns";
+import { collection, getDocs } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 
 export default function DashboardPage() {
@@ -89,7 +92,6 @@ export default function DashboardPage() {
           movementType: movementType !== "all" ? movementType : undefined,
           materialType: materialType !== "all" ? materialType : undefined,
           department: department !== "all" ? department : undefined,
-          products: productsData
         }),
         getMovements() 
       ]);
@@ -186,6 +188,70 @@ export default function DashboardPage() {
         return { name: product?.name || "Desconhecido", total };
       });
   }, [movements, products]);
+
+  const handleExportCSV = async () => {
+    toast({ title: "Gerando relatório...", description: "Aguarde enquanto preparamos o seu ficheiro." });
+
+    try {
+        // 1. Calcula o período do mês passado
+        const today = new Date();
+        const lastMonth = subMonths(today, 1);
+        const startDate = startOfMonth(lastMonth).toISOString();
+        const endDate = endOfMonth(lastMonth).toISOString();
+
+        // 2. Busca todas as movimentações do mês passado
+        const movementsToExport = await getMovements({ startDate, endDate });
+
+        if (movementsToExport.length === 0) {
+            toast({ title: "Nenhum dado encontrado", description: "Não há movimentações registadas no mês passado para exportar.", variant: "destructive" });
+            return;
+        }
+
+        // 3. Prepara os dados para o CSV
+        // Junta informações do produto com a movimentação (opcional mas útil)
+        const productsSnapshot = await getDocs(collection(db, "products"));
+        const productsData = productsSnapshot.docs.reduce((acc, doc) => {
+            acc[doc.id] = doc.data();
+            return acc;
+        }, {} as { [id: string]: any });
+        
+        const csvData = movementsToExport.map(m => ({
+            Data: format(parseISO(m.date), "dd/MM/yyyy HH:mm"),
+            Item: productsData[m.productId]?.name || 'Item não encontrado',
+            Codigo: productsData[m.productId]?.code || 'N/A',
+            TipoMovimento: m.type,
+            TipoEntrada: m.entryType || 'N/A',
+            Quantidade: m.quantity,
+            Setor: m.department || 'N/A',
+            Responsavel: m.responsible,
+            Fornecedor: m.supplier || 'N/A',
+            NotaFiscal: m.invoice || 'N/A'
+        }));
+
+        // 4. Converte os dados para o formato CSV
+        const headers = Object.keys(csvData[0]).join(',');
+        const rows = csvData.map(row => Object.values(row).join(',')).join('\n');
+        const csvString = `${headers}\n${rows}`;
+
+        // 5. Cria e descarrega o ficheiro
+        const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement("a");
+        const url = URL.createObjectURL(blob);
+        link.setAttribute("href", url);
+        const monthName = format(lastMonth, "MMMM-yyyy", { locale: ptBR });
+        link.setAttribute("download", `balanco-almoxarifado-${monthName}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        toast({ title: "Relatório Gerado!", description: "O download do seu ficheiro CSV foi iniciado." });
+
+    } catch (error) {
+        console.error("Erro ao exportar CSV:", error);
+        toast({ title: "Erro ao gerar relatório", description: "Não foi possível buscar os dados para exportação.", variant: "destructive" });
+    }
+};
   
   const handleExport = () => {
         const headers = ["Data", "Tipo", "Produto", "Quantidade", "Responsável", "Departamento"];
@@ -221,6 +287,14 @@ export default function DashboardPage() {
     <div className="flex flex-col gap-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between space-y-2">
         <h1 className="text-3xl font-bold tracking-tight">Painel de Controle</h1>
+        <Button
+        variant="outline"
+        onClick={handleExportCSV} // Esta função será criada no próximo passo
+        disabled={isLoading} // Desativa o botão durante o carregamento
+        >
+            <FileDown className="mr-2 h-4 w-4" />
+            Exportar Balanço do Mês Passado
+        </Button>
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={handleExport}>
             <FileDown className="mr-2 h-4 w-4" />
