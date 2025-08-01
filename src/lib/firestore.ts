@@ -1,5 +1,5 @@
-import { db, storage } from './firebase';
-import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, query, where, runTransaction, getDoc, increment, writeBatch, QueryConstraint, or, orderBy, limit } from 'firebase/firestore';
+import { db } from './firebase';
+import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, query, where, runTransaction, increment, QueryConstraint, orderBy, limit } from 'firebase/firestore';
 import { getStorage, ref, uploadString, getDownloadURL } from "firebase/storage";
 import { parseISO } from 'date-fns';
 
@@ -22,7 +22,7 @@ export type Product = {
 export type Movement = {
     id: string;
     productId: string;
-    date: string; // ISO 8601 format
+    date: string; 
     type: 'Entrada' | 'Saída' | 'Devolução';
     entryType?: 'Oficial' | 'Não Oficial';
     quantity: number;
@@ -30,7 +30,7 @@ export type Movement = {
     department?: string;
     supplier?: string;
     invoice?: string;
-    productType?: 'consumo' | 'permanente'; // Campo adicionado para desnormalização
+    productType?: 'consumo' | 'permanente';
 };
 
 // Data Types for transactions
